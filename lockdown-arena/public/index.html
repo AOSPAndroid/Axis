@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lockdown Arena</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%233c8de0'/><rect x='8' y='14' width='16' height='4' rx='2' fill='%23fff'/></svg>">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="menu" class="overlay">
+    <div class="panel">
+      <h1>LOCKDOWN <span>ARENA</span></h1>
+      <p class="tag">Team control-point brawler. Hold the points, out-score the enemy.</p>
+
+      <label class="field">Name
+        <input id="name" maxlength="16" autocomplete="off" spellcheck="false">
+      </label>
+
+      <div class="section-title">Class</div>
+      <div id="classes" class="classes"></div>
+
+      <div class="section-title">Team</div>
+      <div id="teams" class="teams">
+        <button data-team="-1" class="team auto">Auto</button>
+        <button data-team="0" class="team red">Crimson</button>
+        <button data-team="1" class="team blue">Azure</button>
+      </div>
+
+      <button id="play" class="play">Join match</button>
+
+      <div class="host-tools">
+        <div class="bots">Bots fill each team to
+          <button id="botsMinus" aria-label="Fewer bots">−</button>
+          <b id="botsN">3</b>
+          <button id="botsPlus" aria-label="More bots">+</button>
+        </div>
+        <button id="restart" class="link">Restart match</button>
+      </div>
+
+      <details class="help">
+        <summary>Controls</summary>
+        <table>
+          <tr><td>WASD / Arrows</td><td>Move</td></tr>
+          <tr><td>Mouse</td><td>Aim</td></tr>
+          <tr><td>Left click</td><td>Attack. Hold to charge, release for a charged attack</td></tr>
+          <tr><td>Right click / Space</td><td>Class ability (Dash, Bubble Shield or Cloak)</td></tr>
+          <tr><td>1 2 3 / Q / Wheel</td><td>Blade, Blaster, Bomb</td></tr>
+          <tr><td>R</td><td>Reload the blaster</td></tr>
+          <tr><td>Tab</td><td>Scoreboard</td></tr>
+          <tr><td>C</td><td>Change class (applies on respawn, or instantly in your spawn room)</td></tr>
+          <tr><td>Enter</td><td>Chat</td></tr>
+          <tr><td>Esc</td><td>This menu</td></tr>
+        </table>
+      </details>
+      <p class="share">Others on your network can join at <b id="addr"></b></p>
+    </div>
+  </div>
+
+  <input id="chat" class="chat" maxlength="120" placeholder="Say something… (Enter to send, Esc to cancel)" autocomplete="off">
+  <div id="status" class="status hidden"></div>
+
+  <script src="/shared/shared.js"></script>
+  <script src="/js/audio.js"></script>
+  <script src="/js/render.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

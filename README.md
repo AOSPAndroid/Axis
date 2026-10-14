@@ -58,3 +58,7 @@ The script has been **statically reviewed and has not been tested on the user's 
 
 - [Microsoft: mstsc command reference](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/mstsc)
 - [Microsoft: RDP window placement with winposstr](https://techcommunity.microsoft.com/blog/microsoft-security-blog/specifying-the-ts-client-start-location-on-the-virtual-desktop/246610)
+
+## lockdown-arena
+
+[lockdown-arena](lockdown-arena) is a browser team brawler with three control points, playable over the LAN with `npm start`. It is staged here before moving to its own repository; see its [README](lockdown-arena/README.md).
