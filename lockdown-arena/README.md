@@ -1,5 +1,7 @@
 # Lockdown Arena
 
+![Lockdown Arena](docs/screenshot.png)
+
 A team control-point brawler for the browser, played over your LAN. Two teams fight over
 three capture points; holding points earns score, and the first team to the target wins.
 
