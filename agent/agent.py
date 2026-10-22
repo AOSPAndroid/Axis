@@ -8,6 +8,7 @@ Python 3.8+ standard library only. Usage:
 import argparse
 import base64
 import datetime
+import html
 import http.client
 import json
 import os
@@ -39,7 +40,7 @@ Working directory for the file tools: {workdir}
 {notes}
 
 ## IT work
-1. Read the current state before changing anything. Before a change, say in one line what and why; make one change at a time, then read the state again to verify it. Never claim success without checking.
+1. Read the current state before changing anything. Before a change, say in one line what and why; make one change at a time, then read the state again to verify it. Never claim success without checking. A non-zero exit code or ReturnValue means it failed: report it as a failure with the code, never as success.
 2. Commands must be non-interactive, with short output: Select-Object only the needed properties, -First or -MaxEvents, Format-Table -AutoSize.
 3. Never guess computer names, services, paths or accounts; look them up. Ask before any change on another computer, and before anything risky: deleting data, registry edits, reboots, security software, accounts, groups or permissions.
 4. This session is {elevation}; on other computers your account's rights apply. If access is denied, say so instead of working around it.
@@ -52,7 +53,8 @@ Working directory for the file tools: {workdir}
 - Processes: re-read by ProcessId right before $p.Terminate(). Never end System, smss, csrss, wininit, services, lsass or winlogon.
 - Remote task: Invoke-WmiMethod -ComputerName PC -Class Win32_Process -Name Create -ArgumentList 'cmd.exe /c ...'
 - Active Directory, read-only unless asked: Import-Module ActiveDirectory; Get-ADUser, Get-ADComputer or Get-ADGroup -Identity name -Properties ...; stop if a search matches more than one.
-- Use WMI for other computers.
+- Use WMI to read other computers. PsExec is not used here.
+- Restart a computer: Restart-Computer -ComputerName PC -Force (not Win32Shutdown).
 """
 
 # Collected once at startup and put in the system prompt.
@@ -513,9 +515,22 @@ def run_shell(command, cwd, check_read_only=False):
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 
 
+CLIXML_RE = re.compile(r'<S S="(?:Error|Warning)">(.*?)</S>', re.S)
+
+
+def clixml_to_text(text):
+    """Windows PowerShell sends errors as CLIXML when it has no console; turn them back into text."""
+    head, marker, xml = text.partition("#< CLIXML")
+    if not marker:
+        return text
+    parts = [html.unescape(re.sub(r"_x([0-9A-Fa-f]{4})_", lambda m: chr(int(m.group(1), 16)), value))
+             for value in CLIXML_RE.findall(xml)]
+    return head + "".join(parts).replace("\r\n", "\n")
+
+
 def decode(data):
-    """Command output as text, without a byte-order mark or terminal colour codes."""
-    return ANSI_RE.sub("", data.decode("utf-8", errors="replace").lstrip("\ufeff"))
+    """Command output as text, without a byte-order mark, terminal colour codes or CLIXML."""
+    return clixml_to_text(ANSI_RE.sub("", data.decode("utf-8", errors="replace").lstrip("\ufeff")))
 
 
 def system_facts():
