@@ -1,12 +1,12 @@
 # Local agent
 
-A general-purpose assistant that runs on your own model through llama-server or LM Studio. It chats, works with project files, and has standalone Windows IT tools for package deployment, machine inspection, service/process controls, AD lookup and remote support. Atlas does not need to be installed or running. File tools stay inside the working folder; IT tools use the explicitly configured package repository and selected Windows PCs. Changes ask for approval unless you start with `--yes`.
+A general-purpose assistant that runs on your own model through llama-server or LM Studio. It chats, searches and reads public web pages, works with project files, and has standalone Windows IT tools for package deployment, machine inspection, service/process controls, AD lookup and remote support. Atlas does not need to be installed or running. File tools stay inside the working folder; IT tools use the explicitly configured package repository and selected Windows PCs. Changes ask for approval unless you start with `--yes`.
 
 It needs Python 3.8 or newer and nothing else.
 
 ## Terminal interface
 
-The console opens with the active model, context, thinking/approval mode, workspace and package repository. Responses stream below clearly labelled tool activity; inspections and deployment results use compact tables. During model/tool work an elapsed-time indicator runs in interactive terminals. Reasoning stays compact by default; add `--verbose` to show reasoning (with `--think`) and complete tool results.
+The console opens with the active model, context, thinking/approval mode, workspace and package repository. Responses stream below clearly labelled tool activity; inspections and deployment results use compact tables. Web searches show titles, snippets and source URLs; page reads show an excerpt, links and the next text offset when more is available. During model/tool work an elapsed-time indicator runs in interactive terminals. Reasoning stays compact by default; add `--verbose` to show reasoning (with `--think`) and complete tool results.
 
 The interface uses the standard library and keeps normal terminal scrollback. It adapts to narrow windows, falls back to ASCII when needed, honours `NO_COLOR`, and supports `--plain` for output without colour or animation. Model/file/command text cannot inject terminal control sequences. Approval panels show the complete wrapped action, with control characters made visible.
 
@@ -24,11 +24,25 @@ The interface uses the standard library and keeps normal terminal scrollback. It
 
 Saved job/output IDs accept an unambiguous prefix of at least six characters. Ctrl+C cancels the current request and returns to the prompt; it does not terminate the model server or cancel accepted background jobs. Interrupted actions can have unknown outcomes, so inspect their state before retrying. Input during `/paste` is discarded if cancelled. Incomplete/truncated model tool calls are not executed.
 
-Keep `terminal_ui.py` next to `agent.py`; setup and the Windows bundle include it.
+Keep `terminal_ui.py` and `web_tools.py` next to `agent.py`; setup and the Windows bundle include them.
+
+## Public web search and reading
+
+Web tools are available by default; no API key, browser installation or additional Python packages are needed. Ask naturally:
+
+- “Search Microsoft's documentation for Windows Installer exit code 3010 and cite the sources.”
+- “Read https://docs.python.org/3/library/urllib.request.html and explain proxy handling.”
+- “Follow the installation requirements link from that page and summarize it.”
+
+`web_search` returns result titles, snippets and URLs. `web_read` reads a public HTTP(S) URL, extracts page text and returns links. The agent follows a link by reading its returned URL, requests another text offset for longer pages, and uses a link offset to see more links. A successful fetch means the content was retrieved; it does not verify the page's claims. Full returned text and links are also available through `/output`.
+
+Your PC must be able to reach the search provider and page hosts. Requests inherit the system/environment proxy settings for HTTP(S) destinations. HTTP proxies are supported; HTTPS-proxy URLs, PAC and integrated Windows proxy authentication are not. Some proxies reject the IP-based CONNECT requests used for HTTPS pages; the reader reports an error rather than bypassing the proxy. Provider availability may vary with network policy, rate limits and site changes. Search queries and requested URLs are sent to those external services. The tools do not upload local files or submit forms.
+
+This reads public HTML/text pages. JavaScript-heavy sites, logged-in pages and PDFs are not supported. Web content is untrusted reference material, not instructions for the agent to change its behaviour or run commands. Use `--no-web` to disable the web tools; local chat, notes, files and IT tools remain available.
 
 ## Standalone Windows IT actions
 
-Keep `agent.py`, `it_tools.py`, `it_windows.ps1` and `terminal_ui.py` together. Both setup and the Windows bundle include them. To update an existing bundle, replace these files plus `start.py`; keep your models, notes and `state` folder.
+Keep `agent.py`, `it_tools.py`, `it_windows.ps1`, `terminal_ui.py` and `web_tools.py` together. Both setup and the Windows bundle include them. To update an existing bundle, replace these files plus `start.py`; keep your models, notes and `state` folder.
 
 Start normally; the pictured OneDrive package repository is already the default:
 
@@ -130,6 +144,7 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--ctx` | `16384` | Must match the server's `-c`; older history is compacted to fit |
 | `--yes` | off | Approve writes and commands without asking |
 | `--think` | off | Turn on Qwen's thinking mode: better on hard tasks, slower, uses more context |
+| `--no-web` | off | Disable public web search and page reading |
 | `--package-repo` | OneDrive BetaPackages folder above; environment variables override | Root containing deployable package folders |
 | `--state-dir` | `state` next to agent.py | Durable jobs, snapshots and full tool results |
 | `--max-steps` | `30` | Maximum model/tool rounds per request (1–200) |

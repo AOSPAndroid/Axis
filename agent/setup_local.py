@@ -228,7 +228,7 @@ def setup_llama(root, gpu):
 # ---- agent and launchers -----------------------------------------------------
 
 def setup_agent(root):
-    for name in ("agent.py", "it_tools.py", "it_windows.ps1", "terminal_ui.py"):
+    for name in ("agent.py", "it_tools.py", "it_windows.ps1", "terminal_ui.py", "web_tools.py"):
         here = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
         dest = os.path.join(root, name)
         if os.path.exists(here):

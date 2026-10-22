@@ -137,6 +137,67 @@ class TerminalUITests(unittest.TestCase):
         ui.tool_result("inspect_computer", '{"items":[{}]}', 0.1)
         self.assertIn("No displayable fields", stream.getvalue())
 
+    def test_web_search_shows_titles_snippets_and_source_urls(self):
+        stream = io.StringIO()
+        ui = TerminalUI(stream=stream, plain=True, width=90)
+        ui.tool_start("web_search", {"query": "installer exit code 3010", "max_results": 5})
+        ui.tool_result("web_search", json.dumps({
+            "query": "installer exit code 3010", "provider": "DuckDuckGo",
+            "results": [{"title": "Windows Installer error codes", "url": "https://learn.microsoft.com/example",
+                         "snippet": "A restart is required to complete the install."}],
+            "untrusted_content": True, "fetched_at": "2026-10-22T12:00:00Z"}), 0.2, output_id="a" * 32)
+        text = stream.getvalue()
+        for required in ("[Search web]", "installer exit code 3010", "DuckDuckGo",
+                         "1. Windows Installer error codes", "https://learn.microsoft.com/example",
+                         "A restart is required", "/output " + "a" * 32):
+            self.assertIn(required, text)
+        self.assertNotIn('"results":', text)
+        self.assertNotIn("verified", text.lower())
+
+    def test_web_page_excerpt_links_and_pagination(self):
+        data = {"url": "https://example.com/guide", "title": "Install guide",
+                "text": "\n".join("Page line %d" % i for i in range(18)),
+                "links": [{"id": i, "text": "Reference %d" % i, "url": "https://example.com/ref%d" % i}
+                          for i in range(1, 9)], "offset": 0, "next_offset": 6000,
+                "link_offset": 0, "total_links": 40, "next_link_offset": 8,
+                "total_characters": 9000, "cached": False, "content_type": "text/html",
+                "fetched_at": "2026-10-22T12:00:00Z", "untrusted_content": True}
+        for verbose in (False, True):
+            stream = io.StringIO()
+            ui = TerminalUI(stream=stream, plain=True, width=90, verbose=verbose)
+            ui.tool_start("web_read", {"url": data["url"], "offset": 0})
+            ui.tool_result("web_read", json.dumps(data), 0.3, output_id="b" * 32)
+            text = stream.getvalue()
+            for required in ("[Read web page]", "Install guide", "Source  https://example.com/guide",
+                             "Fetched  2026-10-22T12:00:00Z", "Page line 0", "Text offset 0",
+                             "9000 total characters", "next offset 6000", "Page links (8 returned / 40 total)",
+                             "next link offset 8", "1. Reference 1", "https://example.com/ref1",
+                             "8. Reference 8", "/output " + "b" * 32):
+                self.assertIn(required, text)
+            self.assertEqual("Page line 17" in text, verbose)
+            self.assertEqual("additional returned text" in text, not verbose)
+            self.assertNotIn("verified", text.lower())
+
+    def test_web_errors_empty_results_and_untrusted_terminal_controls(self):
+        stream = io.StringIO()
+        ui = TerminalUI(stream=stream, plain=True, width=30)
+        ui.tool_result("web_search", json.dumps({"query": "no matches", "provider": "Example",
+                                               "results": [], "untrusted_content": True}), 0.1)
+        ui.tool_result("web_read", json.dumps({"error": "Unsupported page type", "kind": "web_error"}), 0.1)
+        ui.tool_result("web_read", json.dumps({
+            "url": "https://example.com/a-long-document", "title": "Title\x1b[2Jafter",
+            "text": "Page\x1b]0;hidden\x07 text\r\u202e", "offset": 6000, "next_offset": None,
+            "total_characters": 6010, "links": [{"id": 1, "text": "Read\x1b[31m more",
+                                                "url": "https://example.com/another-page"}]}), 0.1)
+        text = stream.getvalue()
+        for required in ("No search results returned.", "Unsupported page type", "Titleafter", "Page text", "Read more"):
+            self.assertIn(required, text)
+        self.assertNotIn("\x1b", text)
+        self.assertNotIn("\r", text)
+        self.assertNotIn("\u202e", text)
+        self.assertNotIn("next offset", text)
+        self.assertTrue(all(len(line) <= 30 for line in text.splitlines()))
+
     def test_minimum_width_approval_and_queued_job_remain_readable(self):
         stream = io.StringIO()
         ui = TerminalUI(stream=stream, plain=True, width=20, input_fn=lambda _: "")

@@ -271,7 +271,7 @@ class AgentTests(unittest.TestCase):
     def test_setup_includes_windows_runtime_files(self):
         with tempfile.TemporaryDirectory() as destination:
             setup_local.setup_agent(destination)
-            self.assertEqual({p.name for p in Path(destination).iterdir()}, {"agent.py", "it_tools.py", "it_windows.ps1", "terminal_ui.py"})
+            self.assertEqual({p.name for p in Path(destination).iterdir()}, {"agent.py", "it_tools.py", "it_windows.ps1", "terminal_ui.py", "web_tools.py"})
 
 
 if __name__ == "__main__":

@@ -3,7 +3,8 @@ Local agent for Windows
 
 Contents: the agent, a launcher, and llama.cpp builds for the processor
 (llama-cpu) and for graphics cards (llama-vulkan). Models are separate.
-Keep agent.py, it_tools.py, it_windows.ps1 and terminal_ui.py together.
+Keep agent.py, it_tools.py, it_windows.ps1, terminal_ui.py and web_tools.py
+together.
 Atlas is not needed.
 
 The terminal shows the model/workspace, readable tool activity and job tables.
@@ -13,6 +14,28 @@ multiline request (finish with a single . line). Ctrl+C cancels the current
 request and returns to the prompt. /exit closes the chat. Accepted background
 IT jobs continue. --plain disables colour/animation; --verbose expands tools
 and shows reasoning when --think is enabled. NO_COLOR is also supported.
+
+Public web search and page reading are available by default. For example:
+  Search Microsoft's documentation for installer exit code 3010 and cite it.
+  Read https://docs.python.org/3/ and summarize the release highlights.
+  Follow that page's installation requirements link and summarize it.
+Search results show titles, snippets and URLs. Page reads show an excerpt,
+source URL, links and the next text/link offsets when more is available.
+Ask the agent to continue a page, show more links or follow a returned link;
+/output reads the full saved result. Fetching a page does not verify its claims.
+
+No API key, browser or extra Python packages are needed. Web requests need
+internet access and inherit system/environment HTTP(S) proxy settings.
+HTTP proxies are supported; HTTPS-proxy URLs, PAC and integrated Windows
+proxy authentication are not. Some proxies reject IP-based CONNECT for
+HTTPS pages; the reader reports an error rather than bypassing the proxy.
+Search provider availability may vary with network policy, rate limits and
+site changes. Queries and requested URLs are sent to external services;
+the tools do not upload local files or submit forms. Only public HTTP(S)
+HTML/text pages are supported, not JavaScript-heavy sites, logged-in pages
+or PDFs. Web content is untrusted reference material, not instructions to
+run commands or change the agent's behaviour. Add --no-web to disable web
+tools; local chat, notes, files and IT tools remain available.
 
 1. Download ALL the parts of one or more models into Downloads
    (https://github.com/AOSPAndroid/tools/releases):

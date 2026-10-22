@@ -21,7 +21,8 @@ _TITLES = {"inspect_computer": "Inspect computer", "find_packages": "Find packag
            "computer_action": "Computer action", "directory_lookup": "Directory lookup",
            "open_remote_tool": "Remote support", "run_command": "PowerShell command",
            "list_dir": "List folder", "read_file": "Read file", "write_file": "Write file",
-           "search_notes": "Search notes", "read_note": "Read note", "read_tool_output": "Read saved output"}
+           "search_notes": "Search notes", "read_note": "Read note", "read_tool_output": "Read saved output",
+           "web_search": "Search web", "web_read": "Read web page"}
 _STATES = {"queued": "QUEUED", "running": "RUNNING", "complete": "FINISHED",
            "failed": "FAILED", "unknown": "UNKNOWN", "declined": "DECLINED",
            "copied": "COPIED", "script_succeeded": "SCRIPT EXIT 0", "reboot_required": "REBOOT REQUIRED",
@@ -360,7 +361,7 @@ class TerminalUI:
             self._heading(_TITLES.get(name, clean_text(name).replace("_", " ").title()))
             if isinstance(args, dict):
                 fields = []
-                for key in ("computer", "computers", "view", "action", "package", "script", "name", "pid", "query", "path", "identity", "command"):
+                for key in ("computer", "computers", "view", "action", "package", "script", "name", "pid", "query", "url", "offset", "link_offset", "path", "identity", "command"):
                     if key in args:
                         value = args[key]
                         value = ", ".join(str(v) for v in value) if isinstance(value, list) else str(value)
@@ -433,7 +434,11 @@ class TerminalUI:
                 data = json.loads(text)
             except (ValueError, TypeError):
                 data = None
-            if isinstance(data, dict) and ("jobs" in data or (name == "it_job_status" and "id" in data)):
+            if isinstance(data, dict) and name == "web_search":
+                self._web_search_body(data)
+            elif isinstance(data, dict) and name == "web_read":
+                self._web_read_body(data)
+            elif isinstance(data, dict) and ("jobs" in data or (name == "it_job_status" and "id" in data)):
                 self._jobs_body(data)
             elif isinstance(data, dict):
                 self._result_body(data)
@@ -447,6 +452,64 @@ class TerminalUI:
             if output_id:
                 footer += "  |  /output " + clean_text(output_id)
             self._line(footer, "dim", prefix="  ")
+
+    def _web_search_body(self, data):
+        if data.get("error"):
+            self._line(data["error"], "error", prefix="  ")
+            return
+        if data.get("query"):
+            self._line("Search  " + str(data["query"]), prefix="  ")
+        if data.get("provider"):
+            self._line("Provider  " + str(data["provider"]), "dim", prefix="  ")
+        results = data.get("results") or []
+        if not results:
+            self._line("No search results returned.", "dim", prefix="  ")
+        for number, result in enumerate(results, 1):
+            self._line("%d. %s" % (number, result.get("title") or result.get("url") or "Untitled result"), "accent", prefix="  ", bold=True)
+            if result.get("url"):
+                self._line(result["url"], "dim", prefix="    ")
+            if result.get("snippet"):
+                self._line(result["snippet"], prefix="    ")
+
+    def _web_read_body(self, data):
+        if data.get("error"):
+            self._line(data["error"], "error", prefix="  ")
+            return
+        if data.get("title"):
+            self._line(data["title"], "accent", prefix="  ", bold=True)
+        if data.get("url"):
+            self._line("Source  " + str(data["url"]), "dim", prefix="  ")
+        if data.get("fetched_at"):
+            self._line("Fetched  " + str(data["fetched_at"]), "dim", prefix="  ")
+        text = str(data.get("text") or "")
+        lines = _wrap(clean_text(text), self.width - 4) if text else []
+        for line in lines if self.verbose else lines[:14]:
+            self._line(line, prefix="  ")
+        if not lines:
+            self._line("No readable page text returned.", "dim", prefix="  ")
+        elif not self.verbose and len(lines) > 14:
+            self._line("... additional returned text is in the saved output", "dim", prefix="  ")
+        offset = data.get("offset", 0)
+        pagination = "Text offset %s" % offset
+        if data.get("total_characters") is not None:
+            pagination += "  |  %s total characters" % data["total_characters"]
+        if data.get("next_offset") is not None:
+            pagination += "  |  next offset %s" % data["next_offset"]
+        self._line(pagination, "dim", prefix="  ")
+        links = data.get("links") or []
+        if links:
+            label = "Page links (%d" % len(links)
+            if data.get("total_links") is not None:
+                label += " returned / %s total" % data["total_links"]
+            self._line(label + ")", "dim", prefix="  ")
+            for number, link in enumerate(links if self.verbose else links[:8], 1):
+                self._line("%s. %s" % (link.get("id", number), link.get("text") or link.get("url") or "Untitled link"), prefix="    ")
+                if link.get("url"):
+                    self._line(link["url"], "dim", prefix="      ")
+            if not self.verbose and len(links) > 8:
+                self._line("... %d more links in the saved output" % (len(links) - 8), "dim", prefix="    ")
+        if data.get("next_link_offset") is not None:
+            self._line("More page links: next link offset %s" % data["next_link_offset"], "dim", prefix="  ")
 
     def _result_body(self, data):
         state = data.get("state")
