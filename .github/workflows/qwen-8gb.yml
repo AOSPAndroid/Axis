@@ -1,0 +1,96 @@
+name: Mirror Qwen3.8 9B for 8GB VRAM
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/qwen-8gb.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qwen-8gb-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: github.event.head_commit.message == 'One-time approved Qwen model transfer'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: qwen3.8-9b-q4-k-m
+      MODEL: Qwen3.8-9B-Q4_K_M.gguf
+      SOURCE: https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF/resolve/760121cd70bb4c36b2b5ec58eb765e0df5987efe
+      MODEL_SHA256: df13d66021cef676f82be74053220fd75af6bf2a6a7fb77f5222ab9e50744a7a
+    steps:
+      - name: Download pinned model and verify integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets
+          curl --fail --location --retry 5 --retry-all-errors --connect-timeout 30 --max-time 2400 "$SOURCE/$MODEL" -o "$MODEL"
+          printf '%s  %s\n' "$MODEL_SHA256" "$MODEL" | sha256sum --check -
+          test "$(stat -c %s "$MODEL")" -eq 5780090176
+          curl --fail --location --retry 3 "$SOURCE/README.md" -o assets/UPSTREAM-MODEL-CARD.md
+          curl --fail --location --retry 3 https://www.apache.org/licenses/LICENSE-2.0.txt -o assets/LICENSE-APACHE-2.0.txt
+      - name: Prepare release files under 2 GiB each
+        shell: bash
+        run: |
+          set -euo pipefail
+          split --bytes=1900000000 --numeric-suffixes=1 --suffix-length=3 "$MODEL" "assets/$MODEL.part"
+          printf '%s  %s\n' "$MODEL_SHA256" "$MODEL" > assets/MODEL-SHA256SUM.txt
+          (cd assets && sha256sum "$MODEL".part* > PARTS-SHA256SUMS.txt)
+          cat > assets/README.txt <<'EOF'
+          Qwen3.8-9B Distill Q4_K_M — community model by Empero
+          
+          This is NOT an official Alibaba 9B Qwen3.8 release. Empero describes
+          it as a Qwen3.8 distillation into the Qwen3.5-9B architecture.
+          Source: https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF
+          Revision: 760121cd70bb4c36b2b5ec58eb765e0df5987efe
+          License declared upstream: Apache-2.0. See attached license/model card.
+          Original weights are mirrored without modification; split for transport.
+          
+          Original file: Qwen3.8-9B-Q4_K_M.gguf
+          Original bytes: 5780090176
+          SHA256: df13d66021cef676f82be74053220fd75af6bf2a6a7fb77f5222ab9e50744a7a
+          
+          Download ALL FOUR .part001 through .part004 assets to one folder.
+          They are raw byte chunks, not independently loadable GGUF shards.
+          
+          WINDOWS: open Command Prompt in that folder and run:
+          copy /b Qwen3.8-9B-Q4_K_M.gguf.part001+Qwen3.8-9B-Q4_K_M.gguf.part002+Qwen3.8-9B-Q4_K_M.gguf.part003+Qwen3.8-9B-Q4_K_M.gguf.part004 Qwen3.8-9B-Q4_K_M.gguf
+          
+          Then verify in PowerShell:
+          Get-FileHash .\Qwen3.8-9B-Q4_K_M.gguf -Algorithm SHA256
+          
+          LINUX / MACOS:
+          cat Qwen3.8-9B-Q4_K_M.gguf.part00{1,2,3,4} > Qwen3.8-9B-Q4_K_M.gguf
+          shasum -a 256 -c MODEL-SHA256SUM.txt
+          
+          Import the reassembled GGUF into a recent LM Studio, or run a recent
+          llama.cpp build with Qwen3.5 / Gated DeltaNet support:
+          llama-server -m Qwen3.8-9B-Q4_K_M.gguf -ngl 99 -c 4096 --host 127.0.0.1 --temp 0.6 --top-p 0.95 --top-k 20
+          
+          For an 8 GB GPU, start at 4096 context and one simultaneous request.
+          VRAM use includes weights, cache, runtime buffers and display usage.
+          Reduce context or GPU offload if it does not fit. GPU compatibility
+          and speed depend on the exact card and runtime; not benchmarked here.
+          The 5.78 GB Q4_K_M weights leave more runtime headroom than Q5/Q6.
+          Allow about 12 GB free disk to retain both chunks and the merged file.
+          EOF
+      - name: Upload and publish model release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = true || { echo "Published release already exists; refusing to replace assets."; exit 1; }
+          else
+            gh release create "$TAG" --target "${{ github.sha }}" --draft --latest=false --title "Qwen3.8-9B Distill Q4_K_M (8 GB VRAM)" --notes-file assets/README.txt
+          fi
+          gh release upload "$TAG" assets/* --clobber
+          gh release edit "$TAG" --draft=false --latest=false
+          gh release view "$TAG" --json url,assets
