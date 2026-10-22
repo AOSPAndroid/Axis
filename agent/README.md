@@ -103,6 +103,8 @@ Extract the ZIP, then double-click `Start Agent.bat` inside its `local-agent` fo
 
 If you downloaded model parts instead, `start.py` checks and joins them, using about 2 GB of spare disk and resuming if interrupted. It starts llama-server and opens the agent. If several models are present it asks which to use. Add `--model 35b` to select the 35B or `--model 9b-distill` for the smaller distill.
 
+`--model flash` selects Qwen3.8-Flash-Next: all 36 download parts produce two GGUF files totalling 66.4 GB. Both files must be in the same folder. The launcher loads the first, and llama.cpp finds its companion. Model-specific server options enable memory mapping and lazy table reads. `--model k2` selects K2-Horizon-MoVA-36B-A4B. Model metadata may supply context, temperature and top-p defaults; explicit command-line values override them.
+
 ## Quick setup (Windows)
 
 `setup_local.py` downloads and verifies the model, installs the right llama.cpp build for your GPU, fetches the agent, and writes `start-server.bat` and `agent.bat` into `%USERPROFILE%\local-ai`:
@@ -149,6 +151,7 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--yes` | off | Approve writes and commands without asking |
 | `--think` | on | Enable model thinking and show its reasoning; slower and uses more context |
 | `--no-think` | off | Disable thinking for faster answers |
+| `--temperature`, `--top-p` | 0.6 and 0.95 with thinking; 0.3 and 0.9 without | Sampling overrides; the launcher uses model-specific defaults when present |
 | `--no-web` | off | Disable public web search and page reading |
 | `--package-repo` | OneDrive BetaPackages folder above; environment variables override | Root containing deployable package folders |
 | `--state-dir` | `state` next to agent.py | Durable jobs, snapshots and full tool results |

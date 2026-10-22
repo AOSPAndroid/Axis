@@ -19,9 +19,21 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 PART_SIZE = 1900000000
 RELEASES = "https://github.com/AOSPAndroid/Axis/releases/tag/"
-# Menu order. "parts" are the SHA-256 of each 1.9 GB release part.
-with open(os.path.join(HERE, "models.json")) as _f:
-    MODELS = {m["key"]: dict(m, release=RELEASES + m["tag"]) for m in json.load(_f)}
+def load_models():
+    """Models in menu order. "parts" are the SHA-256 of each 1.9 GB release part. A model in several
+    files lists them under "files"; llama-server is given the first and finds the rest next to it."""
+    with open(os.path.join(HERE, "models.json")) as f:
+        models = {}
+        for m in json.load(f):
+            m = dict(m, release=RELEASES + m["tag"])
+            files = m.get("files") or [{k: m[k] for k in ("file", "size", "sha256", "parts")}]
+            m["files"] = [dict(one, name=m["name"], release=m["release"]) for one in files]
+            m.setdefault("file", m["files"][0]["file"])
+            models[m["key"]] = m
+        return models
+
+
+MODELS = load_models()
 PORT = 8080
 HOME = os.path.expanduser("~")
 SEARCH_DIRS = [HERE, os.path.dirname(HERE), os.path.join(HOME, "Downloads"), os.path.join(HOME, "local-ai")]
@@ -134,30 +146,62 @@ def parts_status(m):
     return found, joining
 
 
-def model_status(m):
-    """("ready", path), ("parts", None) when joinable, ("partial", found count) or (None, 0)."""
-    path = find_file(m["file"], m["size"])
+def file_status(f):
+    """For one model file: ("ready", path), ("parts", None) when joinable, or ("partial", parts found)."""
+    path = find_file(f["file"], f["size"])
     if path:
         return "ready", path
-    if not m["parts"]:
+    if not f["parts"]:
         return None, 0  # parts not published yet
-    found, joining = parts_status(m)
+    found, joining = parts_status(f)
     if joining or all(found):
         return "parts", None
-    count = sum(1 for p in found if p)
+    return "partial", sum(1 for p in found if p)
+
+
+def model_status(m):
+    """("ready", path), ("parts", None) when joinable, ("partial", found count) or (None, 0)."""
+    states = [file_status(f) for f in m["files"]]
+    if all(state == "ready" for state, _ in states):
+        return "ready", states[0][1]
+    if any(state is None for state, _ in states):
+        return None, 0
+    if all(state in ("ready", "parts") for state, _ in states):
+        return "parts", None
+    count = sum(len(f["parts"]) if state != "partial" else found for f, (state, found) in zip(m["files"], states))
     return ("partial", count) if count else (None, 0)
 
 
 def report_missing(m):
-    found, _ = parts_status(m)
     log("%s is not ready yet. Missing or still downloading:" % m["name"])
-    for (name, _, _), p in zip(part_list(m), found):
-        if not p:
-            log("  " + name)
+    for f in m["files"]:
+        if find_file(f["file"], f["size"]):
+            continue
+        found, joining = parts_status(f)
+        if joining:
+            continue
+        for (name, _, _), p in zip(part_list(f), found):
+            if not p:
+                log("  " + name)
     log("\nDownload them from %s" % m["release"])
     log("(wait until none ends in .crdownload). Looked in:")
     for d in SEARCH_DIRS:
         log("  " + d)
+
+
+def same_folder(paths):
+    """Put the files of a split model next to the first one, where llama-server looks for them."""
+    folder = os.path.dirname(paths[0])
+    for path in paths[1:]:
+        if os.path.normcase(os.path.abspath(os.path.dirname(path))) != os.path.normcase(os.path.abspath(folder)):
+            destination = os.path.join(folder, os.path.basename(path))
+            if os.path.lexists(destination):
+                sys.exit("Error: %s already exists. Resolve the duplicate model file before moving %s there." % (destination, path))
+            try:
+                os.rename(path, destination)
+            except OSError:
+                sys.exit("Error: move %s into %s, then start again." % (path, folder))
+    return paths[0]
 
 
 def choose(keys):
@@ -192,14 +236,14 @@ def prepare_model(choice=None):
                     log("  %-30s %s" % (m["name"], m["release"]))
             sys.exit(1)
         for k in partial:
-            log("Still downloading: %s (%d of %d parts)" % (MODELS[k]["name"], status[k][1], len(MODELS[k]["parts"])))
+            log("Still downloading: %s (%d of %d parts)" % (MODELS[k]["name"], status[k][1],
+                                                            sum(len(f["parts"]) for f in MODELS[k]["files"])))
         key = usable[0] if len(usable) == 1 else choose(usable)
-    state, path = status[key]
-    if state == "ready":
-        return key, path
-    if state == "parts":
-        return key, join_parts(MODELS[key])
-    if MODELS[key]["parts"]:
+    state, _ = status[key]
+    if state in ("ready", "parts"):
+        paths = [find_file(f["file"], f["size"]) or join_parts(f) for f in MODELS[key]["files"]]
+        return key, same_folder(paths)
+    if all(f["parts"] for f in MODELS[key]["files"]):
         report_missing(MODELS[key])
     else:
         log("%s has not been published yet: %s" % (MODELS[key]["name"], MODELS[key]["release"]))
@@ -249,13 +293,14 @@ def server_ready():
         return False
 
 
-def start_server(exe, model, ctx, gpu, think=True, alias=None):
+def start_server(exe, model, ctx, gpu, think=True, alias=None, extra=()):
     log_path = os.path.join(HERE, "server.log")
     cmd = [exe, "-m", model, "-c", str(ctx), "--jinja", "--host", "127.0.0.1", "--port", str(PORT),
            # On a graphics card llama.cpp fits as many layers (or, for mixture-of-experts
            # models, the shared layers first) as free memory allows; the rest stays in RAM.
            "-ngl", "auto" if gpu else "0", "--temp", "0.6", "--top-p", "0.95", "--top-k", "20"]
     cmd += ["--alias", alias or os.path.splitext(os.path.basename(model))[0]]
+    cmd += list(extra)
     if not think:
         # Some chat templates ignore the per-request switch; a zero budget ends any thinking at once.
         cmd += ["--reasoning", "off", "--reasoning-budget", "0"]
@@ -311,8 +356,10 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Start llama-server and Axis.")
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
                    help="folder the agent works in (default: the workspace folder here)")
-    p.add_argument("--ctx", type=int, default=16384, help="context size in tokens")
+    p.add_argument("--ctx", type=int, help="context size in tokens (default: model setting, otherwise 16384)")
     p.add_argument("--model", choices=list(MODELS), help="which model to use (default: ask when several are present)")
+    p.add_argument("--temperature", type=float, help="override the model's sampling temperature")
+    p.add_argument("--top-p", type=float, help="override the model's nucleus sampling")
     thinking = p.add_mutually_exclusive_group()
     thinking.add_argument("--think", dest="think", action="store_true", default=True,
                           help="enable and show model thinking (default)")
@@ -324,7 +371,14 @@ def main(argv=None):
     a, agent_args = p.parse_known_args(argv)
 
     key, model = prepare_model(a.model)
-    alias = MODELS[key]["name"]
+    settings = MODELS[key]
+    alias = settings["name"]
+    ctx = a.ctx if a.ctx is not None else settings.get("ctx", 16384)
+    for option, field in (("--temperature", "temperature"), ("--top-p", "top_p")):
+        supplied = getattr(a, field)
+        value = supplied if supplied is not None else settings.get(field)
+        if value is not None:
+            agent_args += [option, str(value)]
     log("Model: %s" % os.path.basename(model))
     os.makedirs(a.workdir, exist_ok=True)
 
@@ -346,7 +400,8 @@ def main(argv=None):
                 continue
             where = "graphics card + processor" if build == "vulkan" else "processor"
             log("Starting llama-server (%s), loading the model" % where)
-            proc = start_server(exe, model, a.ctx, build == "vulkan", think=a.think, alias=alias)
+            proc = start_server(exe, model, ctx, build == "vulkan", think=a.think, alias=alias,
+                                extra=settings.get("server_args", ()))
             if proc:
                 break
             if build == "vulkan":
@@ -357,7 +412,7 @@ def main(argv=None):
     try:
         log()
         return wait_for_agent([sys.executable, os.path.join(HERE, "agent.py"), "--model", alias,
-                               "--workdir", a.workdir, "--ctx", str(a.ctx),
+                               "--workdir", a.workdir, "--ctx", str(ctx),
                                "--think" if a.think else "--no-think"] + agent_args)
     finally:
         if proc:

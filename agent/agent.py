@@ -148,7 +148,7 @@ MAX_ALWAYS = 2000           # chars of ALWAYS.md put in the prompt
 class Agent:
     def __init__(self, base_url, model, workdir, auto_approve, think, ctx=16384, notes=None,
                  package_repo=None, state_dir=None, max_steps=MAX_STEPS, deployment_timeout=3600, ui=None,
-                 web_enabled=True):
+                 web_enabled=True, sampling=None):
         self.ui = ui or TerminalUI()
         self.base_url = base_url.rstrip("/")
         self.notes_dir = os.path.realpath(notes or os.path.join(os.path.dirname(os.path.abspath(__file__)), "notes"))
@@ -157,6 +157,10 @@ class Agent:
         self.workdir = os.path.realpath(workdir)
         self.auto_approve = auto_approve
         self.think = think
+        self.sampling = {"temperature": 0.6 if think else 0.3, "top_p": 0.95 if think else 0.9}
+        self.sampling.update(sampling or {})
+        if not 0 <= self.sampling["temperature"] <= 2 or not 0 <= self.sampling["top_p"] <= 1:
+            raise ValueError("Use a temperature from 0 to 2 and top-p from 0 to 1")
         self.web = WebTools() if web_enabled else None
         self.tools = [tool for tool in TOOLS
                       if web_enabled or tool["function"]["name"] not in WEB_TOOL_NAMES]
@@ -255,9 +259,8 @@ class Agent:
     # ---- model -----------------------------------------------------------
 
     def chat(self):
-        # Thinking mode uses Qwen's recommended sampling; otherwise stay close to the evidence.
-        sampling = {"temperature": 0.6, "top_p": 0.95} if self.think else {"temperature": 0.3, "top_p": 0.9}
-        body = dict({"model": self.model, "messages": self.messages, "tools": self.tools, "top_k": 20}, **sampling)
+        # The launcher can supply model-specific sampling defaults or explicit overrides.
+        body = dict({"model": self.model, "messages": self.messages, "tools": self.tools, "top_k": 20}, **self.sampling)
         body["max_tokens"] = self.max_reply
         body["chat_template_kwargs"] = {"enable_thinking": self.think}
         body["stream"] = True
@@ -941,6 +944,8 @@ def main(argv=None):
     p.add_argument("--workdir", default=".", help="folder the agent may work in")
     p.add_argument("--yes", action="store_true", help="approve writes and commands without asking")
     p.add_argument("--ctx", type=int, default=16384, help="context size the server was started with (-c)")
+    p.add_argument("--temperature", type=float, help="sampling temperature (default: 0.6 with thinking, otherwise 0.3)")
+    p.add_argument("--top-p", type=float, help="nucleus sampling (default: 0.95 with thinking, otherwise 0.9)")
     thinking = p.add_mutually_exclusive_group()
     thinking.add_argument("--think", dest="think", action="store_true", default=True,
                           help="enable and show model thinking (default; slower)")
@@ -957,10 +962,11 @@ def main(argv=None):
     p.add_argument("--no-web", action="store_true", help="disable public web search and page reading")
     a = p.parse_args(argv)
     ui = TerminalUI(plain=a.plain, verbose=a.verbose)
+    sampling = {name: getattr(a, name) for name in ("temperature", "top_p") if getattr(a, name) is not None}
     try:
         agent = Agent(a.url, a.model, a.workdir, a.yes, a.think, a.ctx, a.notes,
                       a.package_repo, a.state_dir, a.max_steps, a.deployment_timeout, ui=ui,
-                      web_enabled=not a.no_web)
+                      web_enabled=not a.no_web, sampling=sampling)
         if a.task:
             answer = agent.run(" ".join(a.task))
             if not agent.answer_shown:

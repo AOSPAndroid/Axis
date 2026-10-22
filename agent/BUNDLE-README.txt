@@ -54,6 +54,8 @@ tools; local chat, notes, files and IT tools remain available.
    (https://github.com/AOSPAndroid/Axis/releases):
 
    Qwen3.6-35B-A3B              22.1 GB, 12 parts  fast; good at terminal tasks
+   Qwen3.8-Flash-Next           66.4 GB, 36 parts  two GGUF files; reads large table from SSD
+   K2-Horizon-MoVA-36B-A4B      22.4 GB, 12 parts  reasoning model
    Qwen3.8-27B                  16.5 GB,  9 parts  newest; best at terminal tasks, slow
    Gemma 4 26B-A4B              14.4 GB,  8 parts  Google; fast
    Qwen3.6-35B-A3B abliterated  21.2 GB, 12 parts  fast; community edit without refusals
@@ -72,7 +74,13 @@ tools; local chat, notes, files and IT tools remain available.
 BUNDLE-COMMIT.txt identifies the source commit used to build this ZIP.
 
 To skip the question: python start.py --model 35b
-(keys: 35b, 27b, gemma, 35b-abliterated, 9b-abliterated, 9b-distill)
+(keys: 35b, k2, flash, 27b, gemma, 35b-abliterated, 9b-abliterated, 9b-distill)
+
+For Qwen3.8-Flash-Next, download all 36 parts from its release and select
+flash. They become two GGUF files which must stay in the same folder;
+the launcher passes the first to llama-server. Existing full GGUF files
+can be used directly. Flash uses memory mapping and on-demand table reads;
+actual RAM use and speed depend on context, GPU offload and SSD performance.
 
 Notes: put your runbooks, procedures, known fixes and names as .md or .txt
 files in the "notes" folder. The agent searches them before guessing, and

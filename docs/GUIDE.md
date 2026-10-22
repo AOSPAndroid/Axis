@@ -65,6 +65,8 @@ If you've downloaded more than one model, Axis asks which one to use. Press Ente
 | Key | Model | Download | Notes |
 | --- | --- | --- | --- |
 | `35b` | Qwen3.6-35B-A3B | [12 parts, 22.1 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m) | **Recommended starting point.** About 3B parameters are active per token; all weights still need memory. |
+| `flash` | Qwen3.8-Flash-Next | [36 parts, 66.4 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-flash-next-gsq-rco-q2-0) | Two GGUF files. Uses memory mapping and on-demand reads for a large table; RAM use and speed depend on context, offload and SSD performance. |
+| `k2` | K2-Horizon-MoVA-36B-A4B | [12 parts, 22.4 GB](https://github.com/AOSPAndroid/Axis/releases/tag/k2-horizon-mova-36b-a4b-q4-k-m) | An alternative reasoning model; the launcher applies its sampling defaults. |
 | `27b` | Qwen3.8-27B | [9 parts, 16.5 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-q4-k-m) | A dense model to compare on harder tasks. Speed depends on hardware and offload. |
 | `gemma` | Gemma 4 26B-A4B | [8 parts, 14.4 GB](https://github.com/AOSPAndroid/Axis/releases/tag/gemma-4-26b-a4b-qat-q4-0) | An alternative from Google. |
 | `9b-distill` | Qwen3.8-9B distill | [4 parts, 5.8 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-9b-q4-k-m) | A smaller community distillation. GPU fit also depends on context and runtime overhead. |
@@ -76,6 +78,8 @@ To skip the menu, start Axis from a terminal in the `local-agent` folder with a 
 ```
 python start.py --model 35b
 ```
+
+For **Qwen3.8-Flash-Next**, download all 36 parts and use `python start.py --model flash`, or select it from the model menu. The launcher joins the parts into two GGUF files and keeps them together. If you already have both full files, place them together in `local-agent`. The 66.4 GB download is substantially larger than Qwen3.6-35B-A3B; memory mapping reduces how much must remain resident, but does not guarantee fit or speed on a 64 GB PC.
 
 **Which model on which PC:**
 
@@ -186,6 +190,7 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | `--cpu` | Use only the processor, even if a graphics card is found. |
 | `--gpu` | Try the graphics card even if it reports less than 4 GB. |
 | `--ctx 8192` | Use a smaller context to save memory. The default is 16384; complex IT conversations benefit from the default. |
+| `--temperature`, `--top-p` | Override the model's sampling defaults. |
 | `--workdir FOLDER` | The folder Axis may read and write files in. Default: `workspace` next to `start.py`. |
 | `--notes FOLDER` | Use a different notes folder. |
 | `--package-repo PATH` | Override the preconfigured package repository. |

@@ -33,6 +33,23 @@ class TUIIntegrationTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
+    def test_model_sampling_defaults_reach_the_chat_request(self):
+        with patch.object(agent, "system_facts", return_value=("Test PC", False)):
+            configured = agent.Agent("http://127.0.0.1:8080/v1", "test-local-model", str(self.root),
+                                     False, True, notes=str(self.root / "notes"),
+                                     state_dir=str(self.root / "state"), ui=self.ui,
+                                     sampling={"temperature": 1.0, "top_p": 0.92})
+        response = MagicMock()
+        response.headers = {"Content-Type": "text/event-stream"}
+        response.__iter__.return_value = iter([event({"content": "Ready"}), event(finish_reason="stop")])
+        with patch.object(configured.http, "open") as open_request:
+            open_request.return_value.__enter__.return_value = response
+            self.assertEqual(configured.chat()["content"], "Ready")
+        body = json.loads(open_request.call_args.args[0].data)
+        self.assertEqual(body["temperature"], 1.0)
+        self.assertEqual(body["top_p"], 0.92)
+        self.assertTrue(body["chat_template_kwargs"]["enable_thinking"])
+
     def test_cancelling_a_tool_batch_preserves_one_result_per_call(self):
         calls = [tool_call("first"), tool_call("interrupted"), tool_call("not_started")]
         self.agent.chat = Mock(return_value={"role": "assistant", "content": "", "tool_calls": calls})

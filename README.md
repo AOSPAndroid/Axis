@@ -37,10 +37,14 @@ The screenshots illustrate workflows in an earlier Axis console with scripted re
 | Model | Size | Best for |
 | --- | --- | --- |
 | [Qwen3.6-35B-A3B](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m) | 22.1 GB | Everyday use: fast and good at terminal tasks. Recommended. |
+| [Qwen3.8-Flash-Next](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-flash-next-gsq-rco-q2-0) | 66.4 GB | Two GGUF files, 36 download parts. Uses memory mapping and reads its large table from disk on demand; performance depends on RAM, SSD and context. |
+| [K2-Horizon-MoVA-36B-A4B](https://github.com/AOSPAndroid/Axis/releases/tag/k2-horizon-mova-36b-a4b-q4-k-m) | 22.4 GB | An alternative reasoning model with its own sampling defaults. |
 | [Qwen3.8-27B](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-q4-k-m) | 16.5 GB | A dense model to compare on harder tasks; speed depends on hardware. |
 | [Gemma 4 26B-A4B](https://github.com/AOSPAndroid/Axis/releases/tag/gemma-4-26b-a4b-qat-q4-0) | 14.4 GB | An alternative from Google. |
 
 The large models need 32 GB of RAM or more. A graphics card with 4 GB or more is used automatically. See the [guide](docs/GUIDE.md#choosing-a-model) for all models.
+
+For Flash, download all 36 parts into Downloads and run `python start.py --model flash`, or choose it in the model menu. Its two GGUF files must stay together. A 64 GB PC should be assessed with its normal workload; fit and speed have not been verified on your hardware.
 
 ## More
 
