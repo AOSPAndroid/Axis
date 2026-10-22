@@ -104,6 +104,7 @@ class Agent:
         self.history_budget = int(ctx * 2.5)
         # The server is local; never route it through a system proxy.
         self.http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        self.stats = {}
         self.facts, self.elevated = system_facts()
         self.reset()
 
@@ -140,7 +141,11 @@ class Agent:
             headers={"Content-Type": "application/json", "Authorization": "Bearer local"})
         try:
             with self.http.open(req, timeout=900) as resp:
-                return json.load(resp)["choices"][0]["message"]
+                data = json.load(resp)
+                timings = data.get("timings") or {}
+                for key in ("cache_n", "prompt_n", "prompt_ms", "predicted_n", "predicted_ms"):
+                    self.stats[key] = self.stats.get(key, 0) + (timings.get(key) or 0)
+                return data["choices"][0]["message"]
         except urllib.error.HTTPError as e:
             raise RuntimeError("server returned %s: %s" % (e.code, e.read().decode("utf-8", "replace")[:500]))
         except urllib.error.URLError as e:
@@ -150,7 +155,21 @@ class Agent:
         except (ValueError, KeyError, IndexError):
             raise RuntimeError("unexpected response from the server")
 
+    def speed(self):
+        """One line on how long the model spent reading and writing for the last task."""
+        s = self.stats
+        if not s.get("predicted_ms"):
+            return ""
+        read = "read %d new tokens" % s["prompt_n"]
+        if s.get("prompt_ms"):
+            read += " at %.0f/s" % (s["prompt_n"] / (s["prompt_ms"] / 1000))
+        if s.get("cache_n"):
+            read += " (%d reused)" % s["cache_n"]
+        write = "wrote %d at %.1f/s" % (s["predicted_n"], s["predicted_n"] / (s["predicted_ms"] / 1000))
+        return "(%s; %s; model time %.0f s)" % (read, write, (s.get("prompt_ms", 0) + s["predicted_ms"]) / 1000)
+
     def run(self, task):
+        self.stats = {}
         self.messages.append({"role": "user", "content": task})
         for _ in range(MAX_STEPS):
             self.trim_history()
@@ -479,6 +498,8 @@ def main():
     try:
         if a.task:
             print(agent.run(" ".join(a.task)))
+            if agent.speed():
+                print(dim(agent.speed()))
             return
         print("Local agent in %s. /reset clears history, /exit quits." % agent.workdir)
         threading.Thread(target=agent.warm_up, daemon=True).start()
@@ -492,6 +513,8 @@ def main():
             if task:
                 try:
                     print("\n" + agent.run(task))
+                    if agent.speed():
+                        print(dim(agent.speed()))
                 except RuntimeError as e:
                     print("Error: %s" % e)
     except RuntimeError as e:
