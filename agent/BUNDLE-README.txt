@@ -1,6 +1,9 @@
 Axis for Windows
 ================
 
+Full guide with screenshots:
+https://github.com/AOSPAndroid/Axis/blob/main/docs/GUIDE.md
+
 Contents: the agent, a launcher, and llama.cpp builds for the processor
 (llama-cpu) and for graphics cards (llama-vulkan). Models are separate.
 Keep agent.py, it_tools.py, it_windows.ps1, terminal_ui.py and web_tools.py
@@ -48,7 +51,7 @@ tools; local chat, notes, files and IT tools remain available.
    You do not need to download or join model parts again.
 
    Otherwise download ALL the parts of one or more models into Downloads
-   (https://github.com/AOSPAndroid/tools/releases):
+   (https://github.com/AOSPAndroid/Axis/releases):
 
    Qwen3.6-35B-A3B              22.1 GB, 12 parts  fast; good at terminal tasks
    Qwen3.8-27B                  16.5 GB,  9 parts  newest; best at terminal tasks, slow

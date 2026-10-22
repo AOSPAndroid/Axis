@@ -18,7 +18,7 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PART_SIZE = 1900000000
-RELEASES = "https://github.com/AOSPAndroid/tools/releases/tag/"
+RELEASES = "https://github.com/AOSPAndroid/Axis/releases/tag/"
 # Menu order. "parts" are the SHA-256 of each 1.9 GB release part.
 with open(os.path.join(HERE, "models.json")) as _f:
     MODELS = {m["key"]: dict(m, release=RELEASES + m["tag"]) for m in json.load(_f)}
@@ -350,7 +350,7 @@ def main():
             sys.exit("Could not start llama-server. Details are in %s" % os.path.join(HERE, "server.log"))
 
     try:
-        log("\nAxis working folder: %s" % os.path.abspath(a.workdir))
+        log()
         return wait_for_agent([sys.executable, os.path.join(HERE, "agent.py"), "--model", alias,
                                "--workdir", a.workdir, "--ctx", str(a.ctx)] + agent_args)
     finally:

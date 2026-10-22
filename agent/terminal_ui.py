@@ -283,6 +283,7 @@ class TerminalUI:
         self.end_thinking()
         with self._lock:
             if not self._response_open:
+                self._line()
                 self._heading("AXIS")
                 self._response_open = True
                 self._response_bold = False

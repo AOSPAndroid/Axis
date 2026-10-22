@@ -1,5 +1,7 @@
 # Axis
 
+See the [user guide with screenshots](../docs/GUIDE.md) for installation and everyday use.
+
 Axis is a general-purpose assistant that runs on your own model through llama-server or LM Studio. It chats, searches and reads public web pages, works with project files, and has standalone Windows IT tools for package deployment, machine inspection, service/process controls, AD lookup and remote support. Atlas does not need to be installed or running. File tools stay inside the working folder; IT tools use the explicitly configured package repository and selected Windows PCs. Changes ask for approval unless you start with `--yes`.
 
 It needs Python 3.8 or newer and nothing else.
@@ -92,10 +94,10 @@ Service and process changes use recent snapshots bound to the selected PC; the b
 
 ## Offline bundle (Windows, browser downloads only)
 
-If the command line can't reach the internet, download [local-agent-windows.zip](https://github.com/AOSPAndroid/tools/releases/download/local-agent-windows/local-agent-windows.zip) and the parts of one model in your browser:
+If the command line can't reach the internet, download [local-agent-windows.zip](https://github.com/AOSPAndroid/Axis/releases/download/local-agent-windows/local-agent-windows.zip) and the parts of one model in your browser:
 
-- [Qwen3.6-35B-A3B](https://github.com/AOSPAndroid/tools/releases/tag/qwen3.6-35b-a3b-q4-k-m): 22 GB, needs 32 GB of RAM or more. This is the recommended model. It's a mixture-of-experts model with about 3B parameters active per token, so it runs well on a processor.
-- [Qwen3.8-9B distill](https://github.com/AOSPAndroid/tools/releases/tag/qwen3.8-9b-q4-k-m): 5.8 GB, needs 16 GB of RAM.
+- [Qwen3.6-35B-A3B](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m): 22 GB, needs 32 GB of RAM or more. This is the recommended model. It's a mixture-of-experts model with about 3B parameters active per token, so it runs well on a processor.
+- [Qwen3.8-9B distill](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-9b-q4-k-m): 5.8 GB, needs 16 GB of RAM.
 
 Extract the ZIP, then double-click `Start Agent.bat` inside its `local-agent` folder. If you already have the complete `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`, copy it into that same folder; no model parts need to be downloaded or joined. Python 3.8 or newer must already be installed.
 
@@ -106,7 +108,7 @@ If you downloaded model parts instead, `start.py` checks and joins them, using a
 `setup_local.py` downloads and verifies the model, installs the right llama.cpp build for your GPU, fetches the agent, and writes `start-server.bat` and `agent.bat` into `%USERPROFILE%\local-ai`:
 
 ```
-curl.exe -LO https://raw.githubusercontent.com/AOSPAndroid/tools/main/agent/setup_local.py
+curl.exe -LO https://raw.githubusercontent.com/AOSPAndroid/Axis/main/agent/setup_local.py
 python setup_local.py
 ```
 

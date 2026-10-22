@@ -1,30 +1,49 @@
 # Axis
 
-A local AI assistant with a terminal interface, public web research and standalone Windows IT tools.
+**A local AI assistant for IT support on Windows.** Axis runs your model on your own PC with llama.cpp. It chats, researches public web pages, deploys packages and checks PCs on your network. Supported read-only operations run straight away; changes ask for approval by default. Web searches send queries to a search provider and page reads contact the requested website.
 
-**[Download Axis for Windows (local-agent-windows.zip)](https://github.com/AOSPAndroid/Axis/releases/download/local-agent-windows/local-agent-windows.zip)**
+Axis has its own deployment, directory and machine inspection tools. **Atlas does not need to be installed or running.**
 
-Extract the ZIP, copy your full GGUF model into the `local-agent` folder beside `Start Agent.bat`, then double-click the launcher. Python 3.8 or newer is required. See the [agent guide](agent/README.md) for supported models, tools and settings.
+![Axis fixing a stopped Print Spooler: it checks first, asks before the change, then verifies](docs/images/03-approval.png)
 
-## Qwen3.8-9B Distill — Q4_K_M
+## Quick start
 
-Model download and instructions for an 8 GB VRAM setup.
+1. Download **[local-agent-windows.zip](https://github.com/AOSPAndroid/Axis/releases/download/local-agent-windows/local-agent-windows.zip)** and extract it.
+2. Copy your full **`Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`** into the `local-agent` folder beside **`Start Agent.bat`**. Python 3.8 or newer must already be installed.
+3. Double-click **`Start Agent.bat`**, wait for the AXIS banner and `You >` prompt, then type a request.
 
-**[Download the model](https://github.com/AOSPAndroid/tools/releases/tag/qwen3.8-9b-q4-k-m)**
+If you need a model, download all parts from its [release page](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m). The launcher can check and join them. Read the **[full guide](docs/GUIDE.md)** for models, options, notes and troubleshooting.
 
-- Model: Empero's community Qwen3.8-9B distillation, using the Qwen3.5-9B architecture. This is not an official Alibaba 9B Qwen3.8 release.
-- Format: GGUF, Q4_K_M quantization; 5,780,090,176 bytes (5.78 GB).
-- Download all four `.part001` through `.part004` assets and follow the release's `README.txt` to reassemble them.
-- Verify the resulting model against `MODEL-SHA256SUM.txt` before loading.
-- Use a recent LM Studio or llama.cpp with Qwen3.5 / Gated DeltaNet support. Start with 4,096 context tokens and one simultaneous request; fit and speed depend on your GPU and runtime.
-- License, upstream model card and checksums are included in the release.
+## What it looks like
 
-## Source
+| Checking a PC | Using your notes |
+| --- | --- |
+| ![Axis checking a PC's uptime and disks without asking](docs/images/02-check.png) | ![Axis answering from the notes folder](docs/images/04-notes.png) |
 
-[empero-ai/Qwen3.8-9B-Distill-GGUF](https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF), revision `760121cd70bb4c36b2b5ec58eb765e0df5987efe`.
+The screenshots illustrate workflows in an earlier Axis console with scripted replies and sample PC names, people and values. The current console adds the AXIS ASCII banner, labelled tools and deployment tables.
 
-SHA-256 of the reassembled GGUF:
+## What Axis does
 
-```text
-df13d66021cef676f82be74053220fd75af6bf2a6a7fb77f5222ab9e50744a7a
-```
+- **Chats and explains** like a normal assistant, without running anything.
+- **Checks computers** by name: online status, uptime, disks, services, processes, logged-on users, event logs and Active Directory lookups. Read-only commands run without asking.
+- **Fixes things** with your approval: starts and stops services, ends stuck processes, restarts PCs. It reads the state first, asks before the change and checks the result afterwards.
+- **Deploys packages** independently: install, uninstall, repair and copy-only workflows with persistent jobs and logs. `/jobs` checks progress.
+- **Researches the public web**: searches, reads pages and follows source links. JavaScript, logins and PDFs are not supported by the bundled reader.
+- **Uses your notes**: runbooks and known fixes in the `notes` folder, searched before it guesses.
+- **Shows its work**: labelled tool activity, result summaries, saved full output through `/output`, and a speed line after each answer.
+
+## Models
+
+| Model | Size | Best for |
+| --- | --- | --- |
+| [Qwen3.6-35B-A3B](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m) | 22.1 GB | Everyday use: fast and good at terminal tasks. Recommended. |
+| [Qwen3.8-27B](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-q4-k-m) | 16.5 GB | A dense model to compare on harder tasks; speed depends on hardware. |
+| [Gemma 4 26B-A4B](https://github.com/AOSPAndroid/Axis/releases/tag/gemma-4-26b-a4b-qat-q4-0) | 14.4 GB | An alternative from Google. |
+
+The large models need 32 GB of RAM or more. A graphics card with 4 GB or more is used automatically. See the [guide](docs/GUIDE.md#choosing-a-model) for all models.
+
+## More
+
+- [User guide](docs/GUIDE.md): installation, models, everyday use, notes, options and troubleshooting.
+- [Technical README](agent/README.md): how the agent and launcher work.
+- [All downloads](https://github.com/AOSPAndroid/Axis/releases)
