@@ -6,6 +6,8 @@ Python 3.8+ standard library only. Usage:
     python agent.py "summarise notes.txt" # one task, then exit
 """
 import argparse
+import base64
+import datetime
 import http.client
 import json
 import os
@@ -13,6 +15,7 @@ import platform
 import re
 import subprocess
 import sys
+import threading
 import urllib.error
 import urllib.request
 import uuid
@@ -20,13 +23,45 @@ import uuid
 MAX_TOOL_OUTPUT = 6000   # chars of tool output sent back to the model
 MAX_STEPS = 15           # tool calls per task before giving up
 
-SYSTEM_PROMPT = """You are a helpful agent running locally on the user's computer.
-Working directory: {workdir}
-Operating system: {os}
+SYSTEM_PROMPT = """You are an IT support agent running locally on the user's computer. You investigate and fix problems with the tools, carefully and step by step.
 
-Use the tools to look at files and run commands when that helps answer the request.
-Paths are relative to the working directory. Check results before moving on.
-When the task is done, reply with a short answer and do not call a tool."""
+## This computer
+{facts}
+Working directory for the file tools: {workdir}
+
+## Rules
+1. Investigate first: use read-only commands to see the current state before changing anything.
+2. Before a change, say in one line what you will change and why. Make one change at a time.
+3. Verify every change with a read-only command. Never say something worked unless you checked.
+4. Commands must be non-interactive: nothing that prompts, pauses, opens a window or waits for input. Pass every value as a parameter.
+5. Prefer PowerShell cmdlets (Get-Service, Get-CimInstance, Get-WinEvent, Get-ItemProperty, Get-NetIPConfiguration, Test-NetConnection) over legacy tools. Keep output short: Select-Object only the properties you need, limit rows with -First or -MaxEvents, use Format-Table -AutoSize or Format-List.
+6. Never guess names, paths or values; look them up. Stop and ask the user when the request is unclear, and before anything risky or hard to undo: deleting data, registry edits, reboots, disabling security software, changing accounts or permissions, or touching another computer.
+7. This session is {elevation}. If a change needs administrator rights and the session is not elevated, say so instead of trying.
+8. When done, reply briefly without calling a tool: what you found, what you changed, and how you verified it.
+
+## Example of a good loop
+User: "Printing is broken, fix it."
+1. Investigate: Get-Service Spooler | Select-Object Status, StartType  ->  Stopped, Automatic
+   Get-WinEvent -FilterHashtable @{{LogName='System'; ProviderName='Service Control Manager'}} -MaxEvents 5 | Format-List TimeCreated, Message  ->  "The Print Spooler service terminated unexpectedly."
+2. Act: "The Print Spooler crashed and is stopped; I will start it."  Start-Service Spooler
+3. Verify: Get-Service Spooler | Select-Object Status  ->  Running
+4. Answer: "The Print Spooler had crashed. I started it and confirmed it is running. If it stops again, a faulty printer driver is the usual cause; I can look into that."
+"""
+
+# Collected once at startup and put in the system prompt.
+FACTS_SCRIPT = r"""
+$ErrorActionPreference = 'SilentlyContinue'
+$os = Get-CimInstance Win32_OperatingSystem
+$cs = Get-CimInstance Win32_ComputerSystem
+$id = [Security.Principal.WindowsIdentity]::GetCurrent()
+$admin = ([Security.Principal.WindowsPrincipal]$id).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$pwsh = Get-Command pwsh
+$pwshVersion = if ($pwsh) { $pwsh.Version.ToString() } else { $null }
+@{ os = $os.Caption; version = $os.Version; build = $os.BuildNumber; arch = $os.OSArchitecture
+   hostname = $env:COMPUTERNAME; user = $id.Name; admin = $admin
+   domain = $cs.Domain; partOfDomain = $cs.PartOfDomain
+   powershell = $PSVersionTable.PSVersion.ToString(); pwsh = $pwshVersion } | ConvertTo-Json -Compress
+"""
 
 TOOLS = [
     {"type": "function", "function": {
@@ -47,7 +82,9 @@ TOOLS = [
             "content": {"type": "string"}}, "required": ["path", "content"]}}},
     {"type": "function", "function": {
         "name": "run_command",
-        "description": "Run a shell command in the working directory and return its output.",
+        "description": ("Run a Windows PowerShell command in the working directory and return its output. "
+                        "Non-interactive: it cannot answer prompts." if os.name == "nt" else
+                        "Run a shell command (sh) in the working directory and return its output."),
         "parameters": {"type": "object", "properties": {
             "command": {"type": "string"}}, "required": ["command"]}}},
 ]
@@ -64,11 +101,27 @@ class Agent:
         self.history_budget = int(ctx * 2.5)
         # The server is local; never route it through a system proxy.
         self.http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        self.facts, self.elevated = system_facts()
         self.reset()
 
     def reset(self):
-        system = SYSTEM_PROMPT.format(workdir=self.workdir, os=platform.system())
+        system = SYSTEM_PROMPT.format(
+            facts=self.facts, workdir=self.workdir,
+            elevation="elevated (administrator rights)" if self.elevated else "not elevated (standard user rights)")
         self.messages = [{"role": "system", "content": system}]
+
+    def warm_up(self):
+        """Have the server process the system prompt now, so the first answer starts sooner."""
+        body = {"model": self.model, "messages": self.messages + [{"role": "user", "content": "hi"}],
+                "tools": TOOLS, "max_tokens": 1}
+        if not self.think:
+            body["chat_template_kwargs"] = {"enable_thinking": False}
+        req = urllib.request.Request(self.base_url + "/chat/completions", data=json.dumps(body).encode("utf-8"),
+                                     headers={"Content-Type": "application/json"})
+        try:
+            self.http.open(req, timeout=600).read()
+        except Exception:
+            pass
 
     # ---- model -----------------------------------------------------------
 
@@ -160,9 +213,9 @@ class Agent:
             if name == "run_command":
                 if not self.confirm("run: %s" % args["command"]):
                     return "User declined to run the command."
-                proc = subprocess.run(args["command"], shell=True, cwd=self.workdir,
-                                      capture_output=True, text=True, errors="replace", timeout=300)
-                out = (proc.stdout + proc.stderr).strip()
+                proc = subprocess.run(shell_command(args["command"]), shell=os.name != "nt", cwd=self.workdir,
+                                      stdin=subprocess.DEVNULL, capture_output=True, timeout=300)
+                out = (decode(proc.stdout) + decode(proc.stderr)).strip()
                 return "exit code %d\n%s" % (proc.returncode, out)
             return "Error: unknown tool %r." % name
         except KeyError as e:
@@ -183,6 +236,66 @@ class Agent:
             return True
         answer = input(yellow("Allow %s? [y/N] " % action)).strip().lower()
         return answer in ("y", "yes")
+
+
+# ---- local system ----------------------------------------------------------
+
+def powershell(script):
+    """Arguments to run a PowerShell script non-interactively with UTF-8 output."""
+    script = ("$ProgressPreference = 'SilentlyContinue'; "
+              "[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false; "
+              "if ($PSStyle) { $PSStyle.OutputRendering = 'PlainText' }\n" + script)
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    return ["powershell.exe", "-NoProfile", "-NonInteractive", "-OutputFormat", "Text", "-EncodedCommand", encoded]
+
+
+# Formats output at a fixed width (a console-less or narrow window would cut tables)
+# and keeps a meaningful exit code: the last program's, else 1 if PowerShell logged an error.
+POWERSHELL_WRAPPER = """$__errors = $Error.Count
+. {
+%s
+} | Out-String -Width 250 -Stream
+if ($LASTEXITCODE) { exit $LASTEXITCODE }
+if ($Error.Count -gt $__errors) { exit 1 }"""
+
+
+def shell_command(command):
+    return powershell(POWERSHELL_WRAPPER % command) if os.name == "nt" else command
+
+
+ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def decode(data):
+    """Command output as text, without a byte-order mark or terminal colour codes."""
+    return ANSI_RE.sub("", data.decode("utf-8", errors="replace").lstrip("\ufeff"))
+
+
+def system_facts():
+    """(text for the system prompt, elevated?) describing this computer."""
+    today = datetime.date.today().isoformat()
+    if os.name == "nt":
+        try:
+            out = subprocess.run(powershell(FACTS_SCRIPT), stdin=subprocess.DEVNULL,
+                                 capture_output=True, timeout=30).stdout
+            f = json.loads(decode(out).strip().splitlines()[-1])
+            join = lambda *parts: " ".join(str(p) for p in parts if p)
+            where = ("domain " if f.get("partOfDomain") else "workgroup ") + f["domain"] if f.get("domain") else ""
+            lines = [("Computer", join(f.get("hostname"), "(%s)" % where if where else "")),
+                     ("User", f.get("user")),
+                     ("OS", join(f.get("os"), f.get("version"), "build %s" % f["build"] if f.get("build") else "", f.get("arch"))),
+                     ("PowerShell", join(f.get("powershell"), "(run_command uses Windows PowerShell%s)" % (
+                         "; PowerShell 7 is also installed as pwsh" if f.get("pwsh") else ""))),
+                     ("Today", today)]
+            return "\n".join("%s: %s" % (k, v) for k, v in lines if v), bool(f.get("admin"))
+        except (OSError, subprocess.SubprocessError, ValueError, IndexError, KeyError):
+            pass
+    import getpass
+    elevated = hasattr(os, "geteuid") and os.geteuid() == 0
+    lines = ["Computer: %s" % platform.node(), "User: %s" % getpass.getuser(),
+             "OS: %s" % platform.platform(),
+             "Shell: %s" % ("Windows PowerShell" if os.name == "nt" else "sh"), "Today: %s" % today]
+    return "\n".join(lines), elevated
 
 
 # ---- model output helpers ------------------------------------------------
@@ -259,6 +372,7 @@ def main():
             print(agent.run(" ".join(a.task)))
             return
         print("Local agent in %s. /reset clears history, /exit quits." % agent.workdir)
+        threading.Thread(target=agent.warm_up, daemon=True).start()
         while True:
             task = input("\n> ").strip()
             if task in ("/exit", "/quit"):
