@@ -249,12 +249,15 @@ def server_ready():
         return False
 
 
-def start_server(exe, model, ctx, gpu):
+def start_server(exe, model, ctx, gpu, think=False):
     log_path = os.path.join(HERE, "server.log")
     cmd = [exe, "-m", model, "-c", str(ctx), "--jinja", "--host", "127.0.0.1", "--port", str(PORT),
            # On a graphics card llama.cpp fits as many layers (or, for mixture-of-experts
            # models, the shared layers first) as free memory allows; the rest stays in RAM.
            "-ngl", "auto" if gpu else "0", "--temp", "0.6", "--top-p", "0.95", "--top-k", "20"]
+    if not think:
+        # Some chat templates ignore the per-request switch; a zero budget ends any thinking at once.
+        cmd += ["--reasoning", "off", "--reasoning-budget", "0"]
     with open(log_path, "w") as log_file:
         try:
             proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=os.path.dirname(exe))
@@ -310,7 +313,7 @@ def main():
                 continue
             where = "graphics card + processor" if build == "vulkan" else "processor"
             log("Starting llama-server (%s), loading the model" % where)
-            proc = start_server(exe, model, a.ctx, build == "vulkan")
+            proc = start_server(exe, model, a.ctx, build == "vulkan", think="--think" in agent_args)
             if proc:
                 break
             if build == "vulkan":

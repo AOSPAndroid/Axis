@@ -135,17 +135,18 @@ class Agent:
         body = dict({"model": self.model, "messages": self.messages, "tools": TOOLS, "top_k": 20}, **sampling)
         if not self.think:
             body["chat_template_kwargs"] = {"enable_thinking": False}
+        body["stream"] = True
         req = urllib.request.Request(
             self.base_url + "/chat/completions",
             data=json.dumps(body).encode("utf-8"),
             headers={"Content-Type": "application/json", "Authorization": "Bearer local"})
         try:
             with self.http.open(req, timeout=900) as resp:
-                data = json.load(resp)
-                timings = data.get("timings") or {}
-                for key in ("cache_n", "prompt_n", "prompt_ms", "predicted_n", "predicted_ms"):
-                    self.stats[key] = self.stats.get(key, 0) + (timings.get(key) or 0)
-                return data["choices"][0]["message"]
+                if "text/event-stream" not in (resp.headers.get("Content-Type") or ""):
+                    data = json.load(resp)  # server ignored "stream"
+                    self.add_timings(data.get("timings"))
+                    return dict(data["choices"][0]["message"], shown=False)
+                return self.read_stream(resp)
         except urllib.error.HTTPError as e:
             raise RuntimeError("server returned %s: %s" % (e.code, e.read().decode("utf-8", "replace")[:500]))
         except urllib.error.URLError as e:
@@ -154,6 +155,45 @@ class Agent:
             raise RuntimeError("connection to the server failed: %s" % e)
         except (ValueError, KeyError, IndexError):
             raise RuntimeError("unexpected response from the server")
+
+    def add_timings(self, timings):
+        for key in ("cache_n", "prompt_n", "prompt_ms", "predicted_n", "predicted_ms"):
+            self.stats[key] = self.stats.get(key, 0) + ((timings or {}).get(key) or 0)
+
+    def read_stream(self, resp):
+        """Collect a streamed reply, printing visible text as it arrives."""
+        live = LiveText()
+        calls = {}
+        thinking_noted = False
+        for raw in resp:
+            line = raw.decode("utf-8", "replace").strip()
+            if not line.startswith("data:"):
+                continue
+            payload = line[5:].strip()
+            if payload == "[DONE]":
+                break
+            chunk = json.loads(payload)
+            if chunk.get("timings"):
+                self.add_timings(chunk["timings"])
+            for choice in chunk.get("choices") or []:
+                delta = choice.get("delta") or {}
+                if delta.get("reasoning_content") and not thinking_noted:
+                    print(dim("(thinking...)"), flush=True)
+                    thinking_noted = True
+                if delta.get("content"):
+                    live.feed(delta["content"])
+                for tc in delta.get("tool_calls") or []:
+                    slot = calls.setdefault(tc.get("index", 0), {"id": "", "type": "function",
+                                                                 "function": {"name": "", "arguments": ""}})
+                    slot["id"] = tc.get("id") or slot["id"]
+                    fn = tc.get("function") or {}
+                    slot["function"]["name"] += fn.get("name") or ""
+                    slot["function"]["arguments"] += fn.get("arguments") or ""
+        live.finish()
+        message = {"role": "assistant", "content": live.text, "shown": live.shown > 0}
+        if calls:
+            message["tool_calls"] = [calls[i] for i in sorted(calls)]
+        return message
 
     def speed(self):
         """One line on how long the model spent reading and writing for the last task."""
@@ -169,7 +209,9 @@ class Agent:
         return "(%s; %s; model time %.0f s)" % (read, write, (s.get("prompt_ms", 0) + s["predicted_ms"]) / 1000)
 
     def run(self, task):
+        """Work on a task; returns the final answer. answer_shown says whether it was already printed."""
         self.stats = {}
+        self.answer_shown = False
         self.messages.append({"role": "user", "content": task})
         for _ in range(MAX_STEPS):
             self.trim_history()
@@ -181,8 +223,9 @@ class Agent:
             self.messages.append({"role": "assistant", "content": content,
                                   **({"tool_calls": calls} if calls else {})})
             if not calls:
+                self.answer_shown = msg.get("shown", False)
                 return content
-            if content:
+            if content and not msg.get("shown"):
                 print(dim(content))
             for call in calls:
                 name = call["function"]["name"]
@@ -419,6 +462,44 @@ def system_facts():
 
 # ---- model output helpers ------------------------------------------------
 
+class LiveText:
+    """Prints streamed model text, hiding <think> blocks and tool-call markup like strip_thinking does."""
+    TAGS = ("<think>", "</think>", "<tool_call>", "<function=")
+
+    def __init__(self):
+        self.text = ""
+        self.shown = 0
+
+    def visible(self, final=False):
+        t = self.text
+        if "</think>" in t:
+            t = t.rsplit("</think>", 1)[1]
+        elif "<think>" in t:
+            t = t.split("<think>", 1)[0]
+        for tag in ("<tool_call>", "<function="):
+            if tag in t:
+                t = t.split(tag, 1)[0]
+        if not final:
+            cut = t.rfind("<")
+            if cut >= 0 and any(tag.startswith(t[cut:]) for tag in self.TAGS):
+                t = t[:cut]  # wait until we know whether this is a tag
+        return t.lstrip()
+
+    def feed(self, piece):
+        self.text += piece
+        self.show(self.visible())
+
+    def show(self, v):
+        if len(v) > self.shown:
+            print(v[self.shown:], end="", flush=True)
+            self.shown = len(v)
+
+    def finish(self):
+        self.show(self.visible(final=True).rstrip())
+        if self.shown:
+            print(flush=True)
+
+
 def strip_thinking(text):
     """Remove Qwen <think> blocks; they should not be fed back into history."""
     if "</think>" in text:
@@ -497,7 +578,9 @@ def main():
     agent = Agent(a.url, a.model, a.workdir, a.yes, a.think, a.ctx)
     try:
         if a.task:
-            print(agent.run(" ".join(a.task)))
+            answer = agent.run(" ".join(a.task))
+            if not agent.answer_shown:
+                print(answer)
             if agent.speed():
                 print(dim(agent.speed()))
             return
@@ -512,7 +595,10 @@ def main():
                 continue
             if task:
                 try:
-                    print("\n" + agent.run(task))
+                    print()
+                    answer = agent.run(task)
+                    if not agent.answer_shown:
+                        print(answer)
                     if agent.speed():
                         print(dim(agent.speed()))
                 except RuntimeError as e:
