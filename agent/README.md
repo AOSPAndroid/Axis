@@ -64,7 +64,7 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 
 Put runbooks, procedures, known fixes and names as `.md` or `.txt` files in the `notes` folder next to `agent.py` (or pass `--notes DIR`). The agent sees the list of files, searches them with `search_notes` before guessing, and opens one with `read_note`. `notes/ALWAYS.md` is loaded into every conversation, so keep it short. `notes/EXAMPLE.md` shows the format.
 
-`--think` turns on the model's reasoning and shows it, dimmed, before the answer. It's slower. In `models.json`, `"think": true` makes `start.py` always pass `--think` for that model (K2-Horizon-MoVA reasons before every answer), and `ctx`, `temperature` and `top_p` set its defaults.
+`--think` turns on the model's reasoning and shows it, dimmed, before the answer. It's slower. In `models.json`, `"think": true` makes `start.py` always pass `--think` for that model (K2-Horizon-MoVA reasons before every answer), and `ctx`, `temperature` and `top_p` set its defaults. `server_args` adds llama-server options. A model that comes in several GGUF files lists them under `files`, each with its own parts; `start.py` joins each one, keeps them in one folder and gives llama-server the first.
 
 ## Notes
 

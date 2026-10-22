@@ -35,6 +35,7 @@ The screenshots show the real Axis interface. The PC names, people and values in
 | Model | Size | Best for |
 | --- | --- | --- |
 | [Qwen3.6-35B-A3B](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m) | 22.1 GB | Everyday use: fast and good at terminal tasks. Recommended. |
+| [Qwen3.8-Flash-Next](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-flash-next-gsq-rco-q2-0) | 66.4 GB | The biggest and strongest (125B). Needs 64 GB of RAM; slower to start. |
 | [K2-Horizon-MoVA-36B-A4B](https://github.com/AOSPAndroid/Axis/releases/tag/k2-horizon-mova-36b-a4b-q4-k-m) | 22.4 GB | Hard problems: the best at terminal tasks. It thinks before every answer and shows its reasoning. |
 | [Qwen3.8-27B](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-q4-k-m) | 16.5 GB | Accurate, but slow without a big graphics card. |
 | [Gemma 4 26B-A4B](https://github.com/AOSPAndroid/Axis/releases/tag/gemma-4-26b-a4b-qat-q4-0) | 14.4 GB | An alternative from Google. |
