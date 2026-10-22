@@ -57,6 +57,17 @@
     "parts": []
   },
   {
+    "key": "9b-abliterated",
+    "name": "Qwen3.5-9B abliterated",
+    "note": "community edit without refusals",
+    "tag": "qwen3.5-9b-abliterated-q4-k-m",
+    "file": "Huihui-Qwen3.5-9B-abliterated.Q4_K_M.gguf",
+    "size": 5627045248,
+    "sha256": "ea1858ef4dc4b648b8dbb44612962a0333e945060dd0545ac0f28d7c4416e4b3",
+    "gpu": "full",
+    "parts": []
+  },
+  {
     "key": "9b-distill",
     "name": "Qwen3.8-9B distill",
     "note": "community distill (the first model)",

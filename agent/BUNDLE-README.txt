@@ -11,6 +11,7 @@ Contents: the agent, a launcher, and llama.cpp builds for the processor
    Gemma 4 26B-A4B              14.4 GB,  8 parts  Google, mixture of experts
    Qwen3.6-35B-A3B abliterated  21.2 GB, 12 parts  community edit without refusals
    Qwen3.5-9B                    5.7 GB,  3 parts  fits fully on an 8 GB graphics card
+   Qwen3.5-9B abliterated        5.6 GB,  3 parts  community edit without refusals
    Qwen3.8-9B distill            5.8 GB,  4 parts  the first model
    Qwen3.5-4B                    2.7 GB,  2 parts  fastest, weaker with tools
 
@@ -26,7 +27,7 @@ Contents: the agent, a launcher, and llama.cpp builds for the processor
    stop both.
 
 To skip the question: python start.py --model 35b
-(keys: 35b, gemma, 35b-abliterated, 9b, 9b-distill, 4b)
+(keys: 35b, gemma, 35b-abliterated, 9b, 9b-abliterated, 9b-distill, 4b)
 
 The agent works in the "workspace" folder next to start.py. To use another
 folder: python start.py --workdir C:\path\to\folder
