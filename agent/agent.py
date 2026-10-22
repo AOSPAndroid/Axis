@@ -29,10 +29,14 @@ SYSTEM_PROMPT = """You are a helpful assistant running locally on the user's Win
 - Only when the request needs them: information from a computer or file, or an action. For greetings, tests, general questions, writing or explanations, just answer without running anything.
 - If the request is unclear, ask a short question instead of guessing.
 - Never invent facts about computers, people, files or settings. Get them with a tool, or say you don't know. When you report results, use the real values from the output.
+- Before guessing names, paths, procedures or how something is done here, search your notes with search_notes.
 
 ## This computer
 {facts}
 Working directory for the file tools: {workdir}
+
+## Your notes
+{notes}
 
 ## IT work
 1. Read the current state before changing anything. Before a change, say in one line what and why; make one change at a time, then read the state again to verify it. Never claim success without checking.
@@ -90,12 +94,29 @@ TOOLS = [
                         "Run a shell command (sh) in the working directory and return its output."),
         "parameters": {"type": "object", "properties": {
             "command": {"type": "string"}}, "required": ["command"]}}},
+    {"type": "function", "function": {
+        "name": "search_notes",
+        "description": "Search the user's notes (runbooks, procedures, names, known fixes) for a word or phrase. "
+                       "Returns matching lines with file name and line number.",
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {
+        "name": "read_note",
+        "description": "Read one note file from the notes folder, by the name shown in the notes list or search results.",
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string"}}, "required": ["name"]}}},
 ]
+
+NOTE_TYPES = (".md", ".txt")
+ALWAYS_NOTE = "ALWAYS.md"   # loaded into every conversation
+MAX_ALWAYS = 2000           # chars of ALWAYS.md put in the prompt
 
 
 class Agent:
-    def __init__(self, base_url, model, workdir, auto_approve, think, ctx=8192):
+    def __init__(self, base_url, model, workdir, auto_approve, think, ctx=8192, notes=None):
         self.base_url = base_url.rstrip("/")
+        self.notes_dir = os.path.realpath(notes or os.path.join(os.path.dirname(os.path.abspath(__file__)), "notes"))
+        os.makedirs(self.notes_dir, exist_ok=True)
         self.model = model
         self.workdir = os.path.realpath(workdir)
         self.auto_approve = auto_approve
@@ -110,9 +131,59 @@ class Agent:
 
     def reset(self):
         system = SYSTEM_PROMPT.format(
-            facts=self.facts, workdir=self.workdir,
+            facts=self.facts, workdir=self.workdir, notes=self.notes_summary(),
             elevation="elevated (administrator rights)" if self.elevated else "not elevated (standard user rights)")
         self.messages = [{"role": "system", "content": system}]
+
+    def note_files(self):
+        found = []
+        for base, _, files in os.walk(self.notes_dir):
+            for name in files:
+                if name.lower().endswith(NOTE_TYPES):
+                    found.append(os.path.relpath(os.path.join(base, name), self.notes_dir))
+        return sorted(found, key=str.lower)
+
+    def read_note_text(self, rel):
+        with open(os.path.join(self.notes_dir, rel), encoding="utf-8", errors="replace") as f:
+            return f.read()
+
+    def notes_summary(self):
+        """Notes folder, its files with their first line, and ALWAYS.md, for the system prompt."""
+        files = self.note_files()
+        if not files:
+            return "No notes yet. The user can add .md or .txt files to %s." % self.notes_dir
+        lines = ["Folder: %s. Files:" % self.notes_dir]
+        for rel in files[:40]:
+            first = next((l.strip().lstrip("#").strip() for l in self.read_note_text(rel).splitlines() if l.strip()), "")
+            lines.append("- %s%s" % (rel, (": " + first[:70]) if first else ""))
+        if len(files) > 40:
+            lines.append("- ... and %d more (use search_notes)" % (len(files) - 40))
+        always = [f for f in files if f.lower() == ALWAYS_NOTE.lower()]
+        if always:
+            lines.append("Always remember (from %s):\n%s" % (ALWAYS_NOTE, shorten(self.read_note_text(always[0]).strip(), MAX_ALWAYS)))
+        return "\n".join(lines)
+
+    def search_notes(self, query):
+        query = (query or "").strip()
+        if not query:
+            return "Error: empty search."
+        phrase = query.lower()
+        words = [w for w in re.findall(r"\w+", phrase) if len(w) >= 3] or [phrase]
+        hits = []
+        for rel in self.note_files():
+            lines = self.read_note_text(rel).splitlines()
+            for i, line in enumerate(lines):
+                low = line.lower()
+                score = (2 * len(words) if phrase in low else 0) + sum(w in low for w in words)
+                if score:
+                    hits.append((-score, rel.lower(), i, rel, lines))
+        if not hits:
+            return "No match in the notes for %r." % query
+        out = []
+        for _, _, i, rel, lines in sorted(hits)[:15]:
+            context = [l.strip() for l in lines[max(0, i - 1):i + 2] if l.strip()]
+            out.append("%s:%d: %s" % (rel, i + 1, " | ".join(context)))
+        return "\n".join(out)
 
     def warm_up(self):
         """Have the server process the system prompt now, so the first answer starts sooner."""
@@ -164,7 +235,7 @@ class Agent:
         """Collect a streamed reply, printing visible text as it arrives."""
         live = LiveText()
         calls = {}
-        thinking_noted = False
+        reasoning_open = False
         for raw in resp:
             line = raw.decode("utf-8", "replace").strip()
             if not line.startswith("data:"):
@@ -177,9 +248,14 @@ class Agent:
                 self.add_timings(chunk["timings"])
             for choice in chunk.get("choices") or []:
                 delta = choice.get("delta") or {}
-                if delta.get("reasoning_content") and not thinking_noted:
-                    print(dim("(thinking...)"), flush=True)
-                    thinking_noted = True
+                if delta.get("reasoning_content"):
+                    if not reasoning_open:
+                        print(dim("thinking: "), end="")
+                        reasoning_open = True
+                    print(dim(delta["reasoning_content"]), end="", flush=True)
+                elif reasoning_open and (delta.get("content") or delta.get("tool_calls")):
+                    print(flush=True)
+                    reasoning_open = False
                 if delta.get("content"):
                     live.feed(delta["content"])
                 for tc in delta.get("tool_calls") or []:
@@ -189,6 +265,8 @@ class Agent:
                     fn = tc.get("function") or {}
                     slot["function"]["name"] += fn.get("name") or ""
                     slot["function"]["arguments"] += fn.get("arguments") or ""
+        if reasoning_open:
+            print(flush=True)
         live.finish()
         message = {"role": "assistant", "content": live.text, "shown": live.shown > 0}
         if calls:
@@ -260,6 +338,13 @@ class Agent:
         if not isinstance(args, dict):
             return "Error: arguments must be a JSON object."
         try:
+            if name == "search_notes":
+                return self.search_notes(args.get("query"))
+            if name == "read_note":
+                full = os.path.realpath(os.path.join(self.notes_dir, args["name"]))
+                if os.path.commonpath([full, self.notes_dir]) != self.notes_dir or not os.path.isfile(full):
+                    return "Error: no note %r. Notes: %s" % (args["name"], ", ".join(self.note_files()) or "none")
+                return self.read_note_text(os.path.relpath(full, self.notes_dir))
             if name == "list_dir":
                 path = self.resolve(args.get("path") or ".")
                 entries = sorted(os.listdir(path))
@@ -469,6 +554,7 @@ class LiveText:
     def __init__(self):
         self.text = ""
         self.shown = 0
+        self.bold = False
 
     def visible(self, final=False):
         t = self.text
@@ -483,6 +569,8 @@ class LiveText:
             cut = t.rfind("<")
             if cut >= 0 and any(tag.startswith(t[cut:]) for tag in self.TAGS):
                 t = t[:cut]  # wait until we know whether this is a tag
+            if t.endswith("*") and not t.endswith("**"):
+                t = t[:-1]   # may be the start of a ** marker
         return t.lstrip()
 
     def feed(self, piece):
@@ -491,13 +579,32 @@ class LiveText:
 
     def show(self, v):
         if len(v) > self.shown:
-            print(v[self.shown:], end="", flush=True)
+            out, self.bold = render_bold(v[self.shown:], self.bold)
+            print(out, end="", flush=True)
             self.shown = len(v)
 
     def finish(self):
         self.show(self.visible(final=True).rstrip())
+        if self.bold:
+            print(render_bold("", True, close=True)[0], end="")
+            self.bold = False
         if self.shown:
             print(flush=True)
+
+
+def render_bold(text, bold=False, close=False):
+    """Turn Markdown **bold** into terminal bold (or drop the markers). Returns (text, bold still on)."""
+    parts = text.split("**")
+    out = parts[0]
+    for part in parts[1:]:
+        bold = not bold
+        if COLOR:
+            out += "\033[1m" if bold else "\033[22m"
+        out += part
+    if close and bold:
+        out += "\033[22m" if COLOR else ""
+        bold = False
+    return out, bold
 
 
 def strip_thinking(text):
@@ -550,12 +657,15 @@ def shorten(text, limit):
 def preview_args(args):
     if not isinstance(args, dict):
         return "?"
-    return ", ".join("%s=%s" % (k, truncate(json.dumps(v), 60)) for k, v in args.items())
+    return ", ".join("%s=%s" % (k, '"%s"' % truncate(v, 120) if isinstance(v, str) else truncate(json.dumps(v), 60))
+                     for k, v in args.items())
+
+
+COLOR = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 
 
 def _color(code):
-    use = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
-    return lambda s: "\033[%sm%s\033[0m" % (code, s) if use else s
+    return lambda s: "\033[%sm%s\033[0m" % (code, s) if COLOR else s
 
 
 dim, cyan, yellow = _color("2"), _color("36"), _color("33")
@@ -572,15 +682,16 @@ def main():
     p.add_argument("--workdir", default=".", help="folder the agent may work in")
     p.add_argument("--yes", action="store_true", help="approve writes and commands without asking")
     p.add_argument("--ctx", type=int, default=8192, help="context size the server was started with (-c)")
-    p.add_argument("--think", action="store_true", help="enable the model's thinking mode (slower)")
+    p.add_argument("--think", action="store_true", help="enable the model's thinking mode (slower; shows its reasoning)")
+    p.add_argument("--notes", help="notes folder (default: the notes folder next to agent.py)")
     a = p.parse_args()
 
-    agent = Agent(a.url, a.model, a.workdir, a.yes, a.think, a.ctx)
+    agent = Agent(a.url, a.model, a.workdir, a.yes, a.think, a.ctx, a.notes)
     try:
         if a.task:
             answer = agent.run(" ".join(a.task))
             if not agent.answer_shown:
-                print(answer)
+                print(render_bold(answer, close=True)[0])
             if agent.speed():
                 print(dim(agent.speed()))
             return
@@ -598,7 +709,7 @@ def main():
                     print()
                     answer = agent.run(task)
                     if not agent.answer_shown:
-                        print(answer)
+                        print(render_bold(answer, close=True)[0])
                     if agent.speed():
                         print(dim(agent.speed()))
                 except RuntimeError as e:

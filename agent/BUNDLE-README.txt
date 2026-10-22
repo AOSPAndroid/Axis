@@ -27,6 +27,14 @@ Contents: the agent, a launcher, and llama.cpp builds for the processor
 To skip the question: python start.py --model 35b
 (keys: 35b, 27b, gemma, 35b-abliterated, 9b-abliterated, 9b-distill)
 
+Notes: put your runbooks, procedures, known fixes and names as .md or .txt
+files in the "notes" folder. The agent searches them before guessing, and
+always reads notes\ALWAYS.md (keep it short). notes\EXAMPLE.md shows the
+format. Re-extracting the zip only replaces EXAMPLE.md.
+
+To see the model's reasoning, start with: "Start Agent.bat" --think
+(slower: it thinks before every answer).
+
 The agent works in the "workspace" folder next to start.py. To use another
 folder: python start.py --workdir C:\path\to\folder
 

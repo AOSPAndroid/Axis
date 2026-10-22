@@ -59,6 +59,12 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--yes` | off | Approve writes and commands without asking |
 | `--think` | off | Turn on Qwen's thinking mode: better on hard tasks, slower, uses more context |
 
+## Your notes
+
+Put runbooks, procedures, known fixes and names as `.md` or `.txt` files in the `notes` folder next to `agent.py` (or pass `--notes DIR`). The agent sees the list of files, searches them with `search_notes` before guessing, and opens one with `read_note`. `notes/ALWAYS.md` is loaded into every conversation, so keep it short. `notes/EXAMPLE.md` shows the format.
+
+`--think` turns on the model's reasoning and shows it, dimmed, before the answer. It's slower.
+
 ## Notes
 
 - On Windows, commands run in Windows PowerShell. Read-only commands (`Get-*`, `Test-Connection`, filtering and formatting cmdlets, `ipconfig /all`, `whoami`, `quser`, `sc.exe query` and similar) run without asking: PowerShell's own parser checks each command first. Anything that changes something, runs a script or calls PsExec still asks. Commands run with your user's permissions. The folder restriction applies to the file tools only. A command can reach anything you can, so read each one before you approve it, and save `--yes` for folders you don't mind losing.
