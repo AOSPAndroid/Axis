@@ -67,6 +67,6 @@ Put runbooks, procedures, known fixes and names as `.md` or `.txt` files in the 
 
 ## Notes
 
-- On Windows, commands run in Windows PowerShell. Read-only commands (`Get-*`, `Test-Connection`, filtering and formatting cmdlets, `ipconfig /all`, `whoami`, `quser`, `sc.exe query` and similar) run without asking: PowerShell's own parser checks each command first. Anything that changes something, runs a script or calls PsExec still asks. Commands run with your user's permissions. The folder restriction applies to the file tools only. A command can reach anything you can, so read each one before you approve it, and save `--yes` for folders you don't mind losing.
+- On Windows, commands run in Windows PowerShell. Read-only commands (`Get-*`, `Test-Connection`, filtering and formatting cmdlets, `ipconfig /all`, `whoami`, `quser`, `sc.exe query` and similar) run without asking: PowerShell's own parser checks each command first. Anything that changes something or runs a script still asks. Commands run with your user's permissions. The folder restriction applies to the file tools only. A command can reach anything you can, so read each one before you approve it, and save `--yes` for folders you don't mind losing.
 - A 9B model works best on short, concrete tasks. Split large jobs into steps.
 - Tool output sent back to the model is cut to 3,000 characters, keeping the start and the end, and a task stops after 15 tool calls.

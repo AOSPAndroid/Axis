@@ -52,7 +52,7 @@ Working directory for the file tools: {workdir}
 - Processes: re-read by ProcessId right before $p.Terminate(). Never end System, smss, csrss, wininit, services, lsass or winlogon.
 - Remote task: Invoke-WmiMethod -ComputerName PC -Class Win32_Process -Name Create -ArgumentList 'cmd.exe /c ...'
 - Active Directory, read-only unless asked: Import-Module ActiveDirectory; Get-ADUser, Get-ADComputer or Get-ADGroup -Identity name -Properties ...; stop if a search matches more than one.
-- Prefer WMI for other computers. Use PsExec only when WMI cannot give what you need, such as the output of a command run inside the other computer: C:\\Data\\PsExec.exe \\\\PC -accepteula -nobanner -n 10 -h powershell.exe -NoProfile -NonInteractive -Command "..."
+- Use WMI for other computers.
 """
 
 # Collected once at startup and put in the system prompt.

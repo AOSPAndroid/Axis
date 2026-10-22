@@ -45,5 +45,5 @@ If something fails, server.log in this folder has llama-server's output.
 
 Read-only commands (Get-*, Test-Connection, ipconfig /all, whoami, quser...)
 run without asking. The agent asks before anything else: changes, scripts,
-PsExec, writing files. Commands run with your own permissions, so read each
+writing files. Commands run with your own permissions, so read each
 one before approving it.
