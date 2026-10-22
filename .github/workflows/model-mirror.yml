@@ -16,24 +16,19 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
-          - tag: qwen3.5-4b-q4-k-m
-            title: Qwen3.5-4B Q4_K_M (fastest, 2.7 GB)
-            hf_repo: unsloth/Qwen3.5-4B-GGUF
-            hf_rev: e87f176479d0855a907a41277aca2f8ee7a09523
-            file: Qwen3.5-4B-Q4_K_M.gguf
-            size: '2740937888'
-            sha256: 00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4
-            about: Official Qwen3.5-4B, quantized by Unsloth. Fast but weaker at tool use.
-          - tag: qwen3.5-9b-q4-k-m
-            title: Qwen3.5-9B Q4_K_M (official, 5.7 GB)
-            hf_repo: unsloth/Qwen3.5-9B-GGUF
-            hf_rev: 3885219b6810b007914f3a7950a8d1b469d598a5
-            file: Qwen3.5-9B-Q4_K_M.gguf
-            size: '5680522464'
-            sha256: 03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8
-            about: Official Qwen3.5-9B, quantized by Unsloth. Fits fully on an 8 GB graphics card.
+          - tag: qwen3.8-27b-q4-k-m
+            title: Qwen3.8-27B Q4_K_M (best at terminal tasks, 16.5 GB)
+            hf_repo: unsloth/Qwen3.8-27B-GGUF
+            hf_rev: 4ca720788d1e01f1bff70c033e0d0028fd02e502
+            file: Qwen3.8-27B-UD-Q4_K_M.gguf
+            size: '16464440224'
+            sha256: 322e194ff79741c7baa497c240f677f54b201b0efab44ca8e50f122b39123482
+            about: >-
+              Official Qwen3.8-27B (August 2026), quantized by Unsloth. Dense model: strongest
+              at terminal and coding tasks in this list, but slow on a processor.
           - tag: gemma-4-26b-a4b-qat-q4-0
             title: Gemma 4 26B-A4B QAT Q4_0 (Google, 14.4 GB)
             hf_repo: google/gemma-4-26B-A4B-it-qat-q4_0-gguf
@@ -155,10 +150,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! gh release view "$TAG" > /dev/null 2>&1; then
-            gh release create "$TAG" --target "$GITHUB_SHA" --draft --latest=false \
-              --title "${{ matrix.title }}" --notes-file assets/README.txt
-          fi
+          for attempt in 1 2 3 4 5 6; do
+            if gh release view "$TAG" > /dev/null 2>&1; then break; fi
+            # Tag main's head: it is already on the default branch.
+            if gh release create "$TAG" --target main --draft --latest=false \
+                 --title "${{ matrix.title }}" --notes-file assets/README.txt; then break; fi
+            echo "Creating the release failed (attempt $attempt); response headers:"
+            GH_DEBUG=api gh api -X POST "repos/$GH_REPO/releases" -f tag_name="$TAG" -f target_commitish=main \
+              -F draft=true -f name="${{ matrix.title }}" 2>&1 | grep -iE '^< (HTTP|x-accepted|x-github-sso|x-ratelimit-remaining|retry-after)|message' || true
+            sleep 60
+          done
+          gh release view "$TAG" > /dev/null
           gh release upload "$TAG" assets/* parts/* --clobber
           gh release edit "$TAG" --draft=false --latest=false --title "${{ matrix.title }}" --notes-file assets/README.txt
           gh release view "$TAG" --json url,assets --jq '.url, (.assets[] | "\(.name) \(.size)")'

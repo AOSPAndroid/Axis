@@ -7,15 +7,13 @@ Contents: the agent, a launcher, and llama.cpp builds for the processor
 1. Download ALL the parts of one or more models into Downloads
    (https://github.com/AOSPAndroid/tools/releases):
 
-   Qwen3.6-35B-A3B              22.1 GB, 12 parts  best quality, fast on a processor
-   Gemma 4 26B-A4B              14.4 GB,  8 parts  Google, mixture of experts
-   Qwen3.6-35B-A3B abliterated  21.2 GB, 12 parts  community edit without refusals
-   Qwen3.5-9B                    5.7 GB,  3 parts  fits fully on an 8 GB graphics card
-   Qwen3.5-9B abliterated        5.6 GB,  3 parts  community edit without refusals
-   Qwen3.8-9B distill            5.8 GB,  4 parts  the first model
-   Qwen3.5-4B                    2.7 GB,  2 parts  fastest, weaker with tools
+   Qwen3.6-35B-A3B              22.1 GB, 12 parts  fast; good at terminal tasks
+   Qwen3.8-27B                  16.5 GB,  9 parts  newest; best at terminal tasks, slow
+   Gemma 4 26B-A4B              14.4 GB,  8 parts  Google; fast
+   Qwen3.6-35B-A3B abliterated  21.2 GB, 12 parts  fast; community edit without refusals
+   Qwen3.5-9B abliterated        5.6 GB,  3 parts  smaller; community edit without refusals
 
-   The mixture-of-experts models need 32 GB of RAM or more.
+   The large models need 32 GB of RAM or more.
    Wait until no file ends in .crdownload.
 
 2. Extract local-agent-windows.zip anywhere, for example Documents.
@@ -27,13 +25,14 @@ Contents: the agent, a launcher, and llama.cpp builds for the processor
    stop both.
 
 To skip the question: python start.py --model 35b
-(keys: 35b, gemma, 35b-abliterated, 9b, 9b-abliterated, 9b-distill, 4b)
+(keys: 35b, 27b, gemma, 35b-abliterated, 9b-abliterated, 9b-distill)
 
 The agent works in the "workspace" folder next to start.py. To use another
 folder: python start.py --workdir C:\path\to\folder
 
-Options: --cpu forces the processor build, --gpu tries the graphics card
-even if none was detected, --ctx 4096 uses less memory.
+A graphics card with 4 GB or more is used automatically (as much of the
+model as fits; the rest stays in RAM). Options: --cpu forces the processor,
+--gpu tries the graphics card anyway, --ctx 4096 uses less memory.
 If something fails, server.log in this folder has llama-server's output.
 
 The agent asks before it writes a file or runs a command. Commands run with

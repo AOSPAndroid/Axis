@@ -19,15 +19,14 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 PART_SIZE = 1900000000
 RELEASES = "https://github.com/AOSPAndroid/tools/releases/tag/"
-# Menu order. "parts" are the SHA-256 of each 1.9 GB release part; "gpu" is
-# "full" (whole model on the graphics card) or "moe" (experts stay in RAM).
+# Menu order. "parts" are the SHA-256 of each 1.9 GB release part.
 with open(os.path.join(HERE, "models.json")) as _f:
     MODELS = {m["key"]: dict(m, release=RELEASES + m["tag"]) for m in json.load(_f)}
 PORT = 8080
 HOME = os.path.expanduser("~")
 SEARCH_DIRS = [HERE, os.path.dirname(HERE), os.path.join(HOME, "Downloads"), os.path.join(HOME, "local-ai")]
 GPU_WORDS = ("nvidia", "radeon", "amd", "intel(r) arc")
-MOE_MIN_VRAM = 3500000000  # Windows caps the reported value at 4 GB
+MIN_VRAM = 3500000000  # Windows caps the reported value at 4 GB, so this means "4 GB or more"
 CHUNK = 8 << 20
 
 
@@ -228,17 +227,9 @@ def gpus():
     return result
 
 
-def gpu_mode(model_key, adapters, force):
-    """How to use the graphics card for this model: "full", "moe" or None (processor only)."""
-    mode = MODELS[model_key]["gpu"]
-    if force:
-        return mode
-    discrete = [ram for name, ram in adapters if any(w in name.lower() for w in GPU_WORDS)]
-    if not discrete:
-        return None
-    if mode == "moe" and max(discrete) < MOE_MIN_VRAM:
-        return None
-    return mode
+def use_gpu(adapters):
+    """True when a graphics card with 4 GB or more is present. Smaller cards are slower than the processor here."""
+    return any(ram >= MIN_VRAM for name, ram in adapters if any(w in name.lower() for w in GPU_WORDS))
 
 
 def find_server(folder):
@@ -258,12 +249,12 @@ def server_ready():
         return False
 
 
-def start_server(exe, model, ctx, mode):
+def start_server(exe, model, ctx, gpu):
     log_path = os.path.join(HERE, "server.log")
     cmd = [exe, "-m", model, "-c", str(ctx), "--jinja", "--host", "127.0.0.1", "--port", str(PORT),
-           "-ngl", "99" if mode else "0", "--temp", "0.6", "--top-p", "0.95", "--top-k", "20"]
-    if mode == "moe":
-        cmd += ["--n-cpu-moe", "999"]  # keep every expert layer in RAM
+           # On a graphics card llama.cpp fits as many layers (or, for mixture-of-experts
+           # models, the shared layers first) as free memory allows; the rest stays in RAM.
+           "-ngl", "auto" if gpu else "0", "--temp", "0.6", "--top-p", "0.95", "--top-k", "20"]
     with open(log_path, "w") as log_file:
         try:
             proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=os.path.dirname(exe))
@@ -310,16 +301,16 @@ def main():
     else:
         adapters = gpus()
         log("Graphics: %s" % (", ".join(name for name, _ in adapters) or "unknown"))
-        mode = None if a.cpu else gpu_mode(key, adapters, a.gpu)
-        builds = ["vulkan", "cpu"] if mode else ["cpu"]
+        gpu = not a.cpu and (a.gpu or use_gpu(adapters))
+        builds = ["vulkan", "cpu"] if gpu else ["cpu"]
         for build in builds:
             exe = find_server(os.path.join(HERE, "llama-" + build))
             if not exe:
                 log("No llama-%s folder next to start.py; skipping." % build)
                 continue
-            where = {"full": "graphics card", "moe": "graphics card + processor"}.get(mode) if build == "vulkan" else "processor"
+            where = "graphics card + processor" if build == "vulkan" else "processor"
             log("Starting llama-server (%s), loading the model" % where)
-            proc = start_server(exe, model, a.ctx, mode if build == "vulkan" else None)
+            proc = start_server(exe, model, a.ctx, build == "vulkan")
             if proc:
                 break
             if build == "vulkan":
