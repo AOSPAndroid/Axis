@@ -35,5 +35,7 @@ model as fits; the rest stays in RAM). Options: --cpu forces the processor,
 --gpu tries the graphics card anyway, --ctx 4096 uses less memory.
 If something fails, server.log in this folder has llama-server's output.
 
-The agent asks before it writes a file or runs a command. Commands run with
-your own permissions, so read each one before approving it.
+Read-only commands (Get-*, Test-Connection, ipconfig /all, whoami, quser...)
+run without asking. The agent asks before anything else: changes, scripts,
+PsExec, writing files. Commands run with your own permissions, so read each
+one before approving it.

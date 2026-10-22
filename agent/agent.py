@@ -220,10 +220,19 @@ class Agent:
                     f.write(args["content"])
                 return "Wrote %s" % args["path"]
             if name == "run_command":
-                if not self.confirm("run: %s" % args["command"]):
-                    return "User declined to run the command."
-                proc = subprocess.run(shell_command(args["command"]), shell=os.name != "nt", cwd=self.workdir,
-                                      stdin=subprocess.DEVNULL, capture_output=True, timeout=300)
+                command = args["command"]
+                # On Windows, read-only commands run straight away; anything else asks first.
+                proc = None
+                if os.name == "nt" and not self.auto_approve:
+                    proc = run_shell(command, self.workdir, check_read_only=True)
+                    if proc.returncode == NEEDS_APPROVAL and b"__NEEDS_APPROVAL__" in proc.stdout:
+                        proc = None
+                    else:
+                        print(dim("(read-only: ran without asking)"))
+                if proc is None:
+                    if not self.confirm("run: %s" % command):
+                        return "User declined to run the command."
+                    proc = run_shell(command, self.workdir)
                 out = (decode(proc.stdout) + decode(proc.stderr)).strip()
                 return "exit code %d\n%s" % (proc.returncode, out)
             return "Error: unknown tool %r." % name
@@ -258,18 +267,105 @@ def powershell(script):
     return ["powershell.exe", "-NoProfile", "-NonInteractive", "-OutputFormat", "Text", "-EncodedCommand", encoded]
 
 
+# Decides whether a command only reads. Uses PowerShell's own parser, so quoting tricks
+# cannot hide a command. Anything not clearly read-only needs the user's approval.
+READ_ONLY_CHECK = r"""
+function Test-ReadOnly([string]$src) {
+  $tokens = $null; $errors = $null
+  $ast = [System.Management.Automation.Language.Parser]::ParseInput($src, [ref]$tokens, [ref]$errors)
+  if ($errors.Count) { return $true }  # nothing runs; PowerShell reports the syntax error
+  $cmdlets = @('where-object','select-object','sort-object','group-object','measure-object','compare-object',
+    'foreach-object','format-table','format-list','format-wide','out-string','select-string','convertto-json',
+    'convertfrom-json','convertto-csv','convertfrom-csv','test-connection','test-netconnection','test-path',
+    'test-wsman','resolve-dnsname','write-output','write-host','join-path','split-path','new-timespan')
+  $aliases = @{ gwmi='get-wmiobject'; gcim='get-ciminstance'; gci='get-childitem'; ls='get-childitem';
+    dir='get-childitem'; cat='get-content'; type='get-content'; gc='get-content'; gsv='get-service';
+    gps='get-process'; ps='get-process'; gi='get-item'; gp='get-itemproperty'; where='where-object';
+    '?'='where-object'; select='select-object'; sort='sort-object'; group='group-object'; measure='measure-object';
+    '%'='foreach-object'; foreach='foreach-object'; ft='format-table'; fl='format-list'; fw='format-wide';
+    echo='write-output'; write='write-output'; sls='select-string'; compare='compare-object'; diff='compare-object' }
+  $anyArgs = @('ping','tracert','pathping','nslookup','whoami','hostname','systeminfo','tasklist','netstat',
+    'getmac','driverquery','quser')
+  $methods = @('tostring','converttodatetime','round','floor','ceiling','truncate','abs','max','min','substring',
+    'trim','trimstart','trimend','tolower','toupper','tolowerinvariant','toupperinvariant','split',
+    'contains','startswith','endswith','indexof','join','format','padleft','padright','gettype','equals',
+    'compareto','adddays','addhours','addminutes','addseconds','toshortdatestring','tolongdatestring',
+    'touniversaltime','tolocaltime','parse','parseexact','gethostname','gethostaddresses','getcurrent',
+    'isinrole','getenvironmentvariable','exists')
+  # Static calls ([Type]::Method()) only on types without side effects.
+  $types = @('math','string','datetime','timespan','convert','int','int32','int64','long','double','decimal',
+    'environment','net.dns','security.principal.windowsidentity','regex','guid','io.path')
+  foreach ($node in $ast.FindAll({ $true }, $true)) {
+    if ($node -is [System.Management.Automation.Language.CommandAst]) {
+      $name = $node.GetCommandName()
+      if (-not $name -or $node.InvocationOperator -ne 'Unknown') { return $false }
+      $n = $name.ToLowerInvariant()
+      if ($aliases.ContainsKey($n)) { $n = $aliases[$n] }
+      if ($n -eq 'foreach-object') {
+        # Only script blocks: "ForEach-Object StopService" would call a method by name.
+        foreach ($e in @($node.CommandElements | Select-Object -Skip 1)) {
+          $isBlock = $e -is [System.Management.Automation.Language.ScriptBlockExpressionAst]
+          $isParam = $e -is [System.Management.Automation.Language.CommandParameterAst] -and $e.ParameterName -in @('Process', 'Begin', 'End')
+          if (-not ($isBlock -or $isParam)) { return $false }
+        }
+        continue
+      }
+      if ($n -like 'get-*' -or $cmdlets -contains $n) { continue }
+      $argv = @($node.CommandElements | Select-Object -Skip 1 | ForEach-Object { $_.Extent.Text.Trim([char[]]"'`"").ToLowerInvariant() })
+      if ($n -eq 'import-module' -and ($argv -join ' ') -eq 'activedirectory') { continue }
+      $exe = $n -replace '\.exe$', ''
+      if ($anyArgs -contains $exe) { continue }
+      if ($exe -eq 'ipconfig' -and -not ($argv | Where-Object { $_ -notin @('/all', '/displaydns') })) { continue }
+      if ($exe -eq 'query' -and $argv.Count -and $argv[0] -in @('user', 'session')) { continue }
+      if ($n -eq 'sc.exe' -and $argv.Count -and $argv[0] -in @('query', 'queryex', 'qc', 'qdescription', 'qfailure', 'getdisplayname', 'getkeyname', 'enumdepend')) { continue }
+      if ($exe -eq 'gpresult' -and -not ($argv | Where-Object { $_ -like '/h*' -or $_ -like '/x*' -or $_ -eq '/f' })) { continue }
+      return $false
+    }
+    if ($node -is [System.Management.Automation.Language.InvokeMemberExpressionAst]) {
+      if ($node.Member -isnot [System.Management.Automation.Language.StringConstantExpressionAst]) { return $false }
+      $m = $node.Member.Value.ToLowerInvariant()
+      if ($methods -notcontains $m) { return $false }
+      if ($node.Static) {
+        if ($node.Expression -isnot [System.Management.Automation.Language.TypeExpressionAst]) { return $false }
+        $t = $node.Expression.TypeName.FullName.ToLowerInvariant() -replace '^system\.', ''
+        $fileCheck = $t -in @('io.file', 'io.directory') -and $m -eq 'exists'
+        if (-not ($types -contains $t -or $fileCheck)) { return $false }
+      }
+    }
+    if ($node -is [System.Management.Automation.Language.FileRedirectionAst]) { return $false }
+    if ($node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left -isnot [System.Management.Automation.Language.VariableExpressionAst]) { return $false }
+  }
+  return $true
+}
+$__readOnly = $false
+try { $__readOnly = Test-ReadOnly $__src } catch { }
+if (-not $__readOnly) { '__NEEDS_APPROVAL__'; exit 97 }
+"""
+
 # Formats output at a fixed width (a console-less or narrow window would cut tables)
 # and keeps a meaningful exit code: the last program's, else 1 if PowerShell logged an error.
-POWERSHELL_WRAPPER = """$__errors = $Error.Count
-. {
+POWERSHELL_WRAPPER = """$__src = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'))
 %s
-} | Out-String -Width 250 -Stream
+$__errors = $Error.Count
+. ([scriptblock]::Create($__src)) | Out-String -Width 250 -Stream
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 if ($Error.Count -gt $__errors) { exit 1 }"""
+NEEDS_APPROVAL = 97
 
 
-def shell_command(command):
-    return powershell(POWERSHELL_WRAPPER % command) if os.name == "nt" else command
+def shell_command(command, check_read_only=False):
+    """Arguments to run a command. With check_read_only, PowerShell exits with NEEDS_APPROVAL
+    instead of running a command that is not clearly read-only."""
+    if os.name != "nt":
+        return command
+    source = base64.b64encode(command.encode("utf-8")).decode("ascii")
+    return powershell(POWERSHELL_WRAPPER % (source, READ_ONLY_CHECK if check_read_only else ""))
+
+
+def run_shell(command, cwd, check_read_only=False):
+    return subprocess.run(shell_command(command, check_read_only), shell=os.name != "nt", cwd=cwd,
+                          stdin=subprocess.DEVNULL, capture_output=True, timeout=300)
 
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
