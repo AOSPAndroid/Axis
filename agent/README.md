@@ -4,6 +4,19 @@ A small agent that runs on your own model through llama-server or LM Studio. It 
 
 It needs Python 3.8 or newer and nothing else.
 
+## Quick setup (Windows)
+
+`setup_local.py` downloads and verifies the model, installs the right llama.cpp build for your GPU, fetches the agent, and writes `start-server.bat` and `agent.bat` into `%USERPROFILE%\local-ai`:
+
+```
+curl.exe -LO https://raw.githubusercontent.com/AOSPAndroid/tools/claude/local-agent/agent/setup_local.py
+python setup_local.py
+```
+
+You need about 12 GB of free disk space while it runs. Running it again resumes an interrupted download and skips steps that are already done. Options: `--dir D:\ai` installs somewhere else, and `--gpu vulkan` or `--gpu cpu` overrides the build it picks.
+
+Then double-click `start-server.bat`, open a terminal in a project folder, and run `agent.bat`. The sections below cover a manual setup.
+
 ## 1. Start the model server
 
 **llama.cpp:** put `start-server.bat` next to `Qwen3.8-9B-Q4_K_M.gguf` and run it. It amounts to:
