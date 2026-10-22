@@ -18,7 +18,20 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PART_SIZE = 1900000000
-PARTS_35B = []  # filled in from the release PARTS-SHA256SUMS.txt
+PARTS_35B = [  # SHA-256 of each release part, from PARTS-SHA256SUMS.txt
+    "9410960161ddd35a7c0876d6717d99340512d789904bb5b65c154d9527d89753",
+    "730ee3d393f9a49dbf9150ca326ca7de7e8903cc54e5dbcf6ceb74db02f5fc2c",
+    "722c5c3efe67c22f492c693708676528df81e69edb7b326ca503008792eea3b8",
+    "bd7686c48fe02eb08aa4a9d6302698c55e2564b454f8e0fbbb7fb46652dfe3fe",
+    "ce046b8ac93c1e452d5e45f1f416dce949b4ef2df9222b9b4ef2806a15eb4911",
+    "c61d79d44485877ab1b38c99b77207f3ab584bb39ef96bdbd8019d459530800e",
+    "028293916e1d914f14c8387da67ff4c9bbcb398275abb4399ebae2cffe24340f",
+    "3d9f97d212f69f55b91b0e5e216f934047590ba7ec4f2f72b35d6819a98528c0",
+    "4e80b8e3071bc3d03c63e948672771a893873ff1fadcaa1293f53963bad5228b",
+    "ea37d6b0ad6a3949798b141c438fd05194ca452bf572bf1e3d1886b3f7f2ff26",
+    "bd87cf0f7606845216f0be02aef9b4183c4d290c1ac6c0157b3f1be60495eff9",
+    "993294c84033115840d836f1f8ecb929c133d22111344663781a6505474ae189",
+]
 RELEASES = "https://github.com/AOSPAndroid/tools/releases/tag/"
 # Preferred first. "parts" are the SHA-256 of each 1.9 GB release part, in order.
 MODELS = {
