@@ -3,6 +3,7 @@ Local agent for Windows
 
 Contents: the agent, a launcher, and llama.cpp builds for the processor
 (llama-cpu) and for graphics cards (llama-vulkan). Models are separate.
+Keep agent.py, it_tools.py and it_windows.ps1 together. Atlas is not needed.
 
 1. Download ALL the parts of one or more models into Downloads
    (https://github.com/AOSPAndroid/tools/releases):
@@ -42,6 +43,23 @@ A graphics card with 4 GB or more is used automatically (as much of the
 model as fits; the rest stays in RAM). Options: --cpu forces the processor,
 --gpu tries the graphics card anyway, --ctx 4096 uses less memory.
 If something fails, server.log in this folder has llama-server's output.
+
+Standalone IT actions: inspect PCs, deploy/install/uninstall/repair packages,
+control services/processes, check AD, reboot with monitoring and open remote
+support tools. Configure the package folder when starting:
+  python start.py --model 35b --package-repo "D:\Packages"
+AGENT_PACKAGE_REPO (or WMI_PACKAGE_REPO) can set the same folder.
+WMI/file sharing and your Windows account's rights must permit the operation;
+AD lookup needs RSAT. The default context is 16384 tokens; --ctx 8192 reduces it.
+
+Ask for package discovery and a copy-only test before your first deployment.
+A job ID means queued; ask for its status and each PC's result. Script exit 0
+does not verify application health. Unknown outcomes must be inspected before
+retrying. Jobs run separately from chat and continue when the chat closes.
+State, snapshots and full tool results are kept in the state folder; preserve
+it when updating. Each attempt's full remote log stays under
+C:\Temp\LocalAgent\Jobs on the target. Only this agent's package staging
+(C:\Temp\LocalAgent\Packages) is removed by its cleanup action.
 
 Read-only commands (Get-*, Test-Connection, ipconfig /all, whoami, quser...)
 run without asking. The agent asks before anything else: changes, scripts,

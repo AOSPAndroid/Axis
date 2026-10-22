@@ -228,30 +228,32 @@ def setup_llama(root, gpu):
 # ---- agent and launchers -----------------------------------------------------
 
 def setup_agent(root):
-    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent.py")
-    dest = os.path.join(root, "agent.py")
-    if os.path.exists(here):
-        if os.path.abspath(here) != os.path.abspath(dest):
-            shutil.copyfile(here, dest)
-    else:
-        with open(dest, "wb") as f:
-            f.write(fetch(AGENT_URL))
-    return dest
+    for name in ("agent.py", "it_tools.py", "it_windows.ps1"):
+        here = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+        dest = os.path.join(root, name)
+        if os.path.exists(here):
+            if os.path.abspath(here) != os.path.abspath(dest):
+                shutil.copyfile(here, dest)
+        else:
+            url = AGENT_URL if name == "agent.py" else AGENT_URL.rsplit("/", 1)[0] + "/" + name
+            with open(dest, "wb") as f:
+                f.write(fetch(url))
+    return os.path.join(root, "agent.py")
 
 
 def write_launchers(root, server, model):
     start = os.path.join(root, "start-server.bat")
     with open(start, "w", newline="\r\n") as f:
         f.write('@echo off\n'
-                'rem Starts the model server for the agent. Set CTX=4096 first if 8192 does not fit.\n'
-                'if "%%CTX%%"=="" set CTX=8192\n'
+                'rem Starts the model server for the agent. Set CTX=8192 first if 16384 does not fit.\n'
+                'if "%%CTX%%"=="" set CTX=16384\n'
                 '"%s" -m "%s" -ngl 99 -c %%CTX%% --jinja --host 127.0.0.1 --port 8080 '
                 '--temp 0.6 --top-p 0.95 --top-k 20\n' % (server, model))
     agent = os.path.join(root, "agent.bat")
     with open(agent, "w", newline="\r\n") as f:
         f.write('@echo off\n'
                 'rem Runs the agent in the current folder. Extra options are passed through.\n'
-                'if "%%CTX%%"=="" set CTX=8192\n'
+                'if "%%CTX%%"=="" set CTX=16384\n'
                 '"%s" "%s" --workdir "%%CD%%" --ctx %%CTX%% %%*\n' % (sys.executable, os.path.join(root, "agent.py")))
     return start, agent
 

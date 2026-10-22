@@ -287,7 +287,7 @@ def main():
     p = argparse.ArgumentParser(description="Start llama-server and the local agent.")
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
                    help="folder the agent works in (default: the workspace folder here)")
-    p.add_argument("--ctx", type=int, default=8192, help="context size in tokens")
+    p.add_argument("--ctx", type=int, default=16384, help="context size in tokens")
     p.add_argument("--model", choices=list(MODELS), help="which model to use (default: ask when several are present)")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--cpu", action="store_true", help="always run on the processor")

@@ -1,8 +1,52 @@
 # Local agent
 
-A small general-purpose assistant that runs on your own model through llama-server or LM Studio. It chats and answers like any assistant, and when a request needs it, it can list folders, read and write files, and run PowerShell commands for IT work. It only touches files inside its working folder, and it asks before every write and every command.
+A general-purpose assistant that runs on your own model through llama-server or LM Studio. It chats, works with project files, and has standalone Windows IT tools for package deployment, machine inspection, service/process controls, AD lookup and remote support. Atlas does not need to be installed or running. File tools stay inside the working folder; IT tools use the explicitly configured package repository and selected Windows PCs. Changes ask for approval unless you start with `--yes`.
 
 It needs Python 3.8 or newer and nothing else.
+
+## Standalone Windows IT actions
+
+Keep `agent.py`, `it_tools.py` and `it_windows.ps1` together. Both setup and the Windows bundle include them. To update an existing bundle, replace these files plus `start.py`; keep your models, notes and `state` folder.
+
+Set the root folder that contains your package folders, then start normally:
+
+```bat
+python start.py --model 35b --package-repo "D:\Packages"
+```
+
+`AGENT_PACKAGE_REPO` can set the same path; the existing `WMI_PACKAGE_REPO` variable is also accepted. A synced OneDrive/SharePoint folder or an accessible UNC share can be used. The agent never invents this path or requires Atlas's database. Without a repository, chat, machine inspection and other IT tools still work.
+
+Example requests (replace `PC-123` with your intended target):
+
+- “Find the available packages for ExampleApp and show its install and uninstall scripts.”
+- “Check PC-123's WMI access, administrative share and free disk space.”
+- “Copy the selected ExampleApp package to PC-123 without running it, then check the job.”
+- “Install the selected package on PC-123 and PC-456 and report each result and log.”
+- “Inspect the print spooler on PC-123, restart it, and verify that it is running.”
+- “Show PC-123's processes and stop the selected process.”
+- “Look up this exact AD account and show its groups.”
+- “Open Remote Assistance for PC-123.”
+
+The model gets these tools:
+
+| Tool | What it does |
+| --- | --- |
+| `inspect_computer` | Preflight, OS/user/memory, disks, services, processes and machine-wide software registrations; paginated results. |
+| `find_packages` | Search package folders and discover `.ps1`/`.vbs` scripts ending in `_i`/`_install`/`_installs`, `_u`/`_uninstall`/`_uninstalls`, or `_r`/`_repair`/`_repairs`. |
+| `deploy_package` | Install, uninstall or repair through the selected package script; full, copy-only or execute-existing modes; up to 200 explicit PCs, processed in order. |
+| `it_job_status` | Saved per-PC outcomes, exit codes and logs, with bounded waits; inspect unknown outcomes before releasing a target for another attempt. |
+| `computer_action` | Verified service start/stop/restart, checked process termination, explicit RemoteRegistry enable/start, monitored reboot, and cleanup of this agent's package staging only. |
+| `directory_lookup` | Exact AD user/computer/group lookup and membership; read-only. |
+| `open_remote_tool` | RDP, Remote Assistance, Computer Management, Event Viewer, administrative share, temp or package folder. Opens the UI; does not automate a remote session. |
+| `read_tool_output` | Read the full saved output when a result was too long for the conversation. |
+
+Deployment uses your Windows identity, SMB administrative shares, Robocopy and WMI/DCOM; it does not use PsExec or require WinRM. Targets must permit WMI/file sharing and your account must have the needed rights. AD lookup needs RSAT's ActiveDirectory module. The backend never changes firewall policy or credentials to work around access errors.
+
+Packages stage under `C:\Temp\LocalAgent\Packages` on each target; each attempt owns a unique log/exit record under `C:\Temp\LocalAgent\Jobs`. The approved installer checksum is rechecked before launch. Robocopy codes 0–7 mean successful copying; 8+ fail. A job ID means queued. `script_succeeded` means the script returned 0, **not** that the application is healthy; `reboot_required` reports script exit 3010/1641 and still requires checking the application/vendor log. Missing exit records or lost monitoring produce `unknown`, never success or an automatic retry.
+
+Deployment/reboot workers run separately from the chat, so closing the chat does not cancel remote work. Job records and full tool output live in `state` next to the agent (override with `--state-dir`). If the worker/PC stops unexpectedly, inspect `it_job_status` and the target before retrying. Unknown jobs reserve their targets until you explicitly acknowledge inspection. No automatic reboot or remote installer cancellation is performed.
+
+Service and process changes use recent snapshots bound to the selected PC; the backend re-reads identity before acting and checks the final state. Critical services/processes are protected. Software inventory reads machine-wide uninstall registry entries, not `Win32_Product`; user registrations and MSIX/Appx packages are not included. Uninstall/repair uses your repository's corresponding script, not guessed vendor switches. Existing `run_command` remains available for operations outside these named tools.
 
 ## Offline bundle (Windows, browser downloads only)
 
@@ -31,10 +75,10 @@ Then double-click `start-server.bat`, open a terminal in a project folder, and r
 **llama.cpp:** put `start-server.bat` next to `Qwen3.8-9B-Q4_K_M.gguf` and run it. It amounts to:
 
 ```
-llama-server -m Qwen3.8-9B-Q4_K_M.gguf -ngl 99 -c 8192 --jinja --host 127.0.0.1 --port 8080 --temp 0.6 --top-p 0.95 --top-k 20
+llama-server -m Qwen3.8-9B-Q4_K_M.gguf -ngl 99 -c 16384 --jinja --host 127.0.0.1 --port 8080 --temp 0.6 --top-p 0.95 --top-k 20
 ```
 
-`--jinja` is required: without it llama-server ignores tool definitions. An agent needs more context than plain chat, so this uses 8192 tokens. If that doesn't fit in 8 GB VRAM, run `set CTX=4096` first and pass `--ctx 4096` to the agent.
+`--jinja` is required: without it llama-server ignores tool definitions. The Windows tools need more context than plain chat, so the default is 16384 tokens. If memory is tight, use `--ctx 8192` on both server and agent. When using `start.py`, `--ctx` is passed to both automatically.
 
 **LM Studio:** load the model, start the local server (Developer tab), and pass `--url http://127.0.0.1:1234/v1` to the agent.
 
@@ -55,9 +99,13 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--url` | `http://127.0.0.1:8080/v1` | Server address (`AGENT_URL` env var) |
 | `--model` | `Qwen3.8-9B-Q4_K_M` | Model name sent to the server (`AGENT_MODEL`) |
 | `--workdir` | current folder | The only folder the file tools may use |
-| `--ctx` | `8192` | Must match the server's `-c`; older history is dropped to fit |
+| `--ctx` | `16384` | Must match the server's `-c`; older history is compacted to fit |
 | `--yes` | off | Approve writes and commands without asking |
 | `--think` | off | Turn on Qwen's thinking mode: better on hard tasks, slower, uses more context |
+| `--package-repo` | `AGENT_PACKAGE_REPO` / `WMI_PACKAGE_REPO` | Root containing deployable package folders |
+| `--state-dir` | `state` next to agent.py | Durable jobs, snapshots and full tool results |
+| `--max-steps` | `30` | Maximum model/tool rounds per request (1–200) |
+| `--deployment-timeout` | `3600` | Copy/installer monitoring timeout in seconds (60–86400) |
 
 ## Your notes
 
@@ -69,4 +117,10 @@ Put runbooks, procedures, known fixes and names as `.md` or `.txt` files in the 
 
 - On Windows, commands run in Windows PowerShell. Read-only commands (`Get-*`, `Test-Connection`, filtering and formatting cmdlets, `ipconfig /all`, `whoami`, `quser`, `sc.exe query` and similar) run without asking: PowerShell's own parser checks each command first. Anything that changes something or runs a script still asks. Commands run with your user's permissions. The folder restriction applies to the file tools only. A command can reach anything you can, so read each one before you approve it, and save `--yes` for folders you don't mind losing.
 - A 9B model works best on short, concrete tasks. Split large jobs into steps.
-- Tool output sent back to the model is cut to 3,000 characters, keeping the start and the end, and a task stops after 15 tool calls.
+- Tool output shown to the model is capped at 3,000 characters; longer results are saved in full and can be read in pages. A request stops after 30 model/tool rounds by default; accepted background IT jobs continue.
+
+## Verification
+
+Run `python -m unittest discover -s agent/tests -v` from the repository root. Tests use temporary package repositories and simulated Windows responses; they never deploy, reboot or change a live PC. When Windows PowerShell or `pwsh` is installed, PowerShell tests also execute the backend against mock WMI objects, including stale identities, protected operations, failed return codes and missing final state. `AGENT_TEST_POWERSHELL` selects a specific executable.
+
+Before broad use, run a copy-only job and a small test package against a Windows test PC using your actual account. Domain permissions, network policy and vendor installer behaviour require verification in your environment.

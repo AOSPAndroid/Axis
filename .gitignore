@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+agent/state/
+agent/server.log
+agent/workspace/
