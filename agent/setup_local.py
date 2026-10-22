@@ -29,7 +29,7 @@ RELEASE = os.environ.get(
 AGENT_URL = os.environ.get(
     "SETUP_AGENT_URL",
     "https://raw.githubusercontent.com/AOSPAndroid/tools/claude/local-agent/agent/agent.py")
-LLAMA_API = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
+LLAMA_API = "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=50"
 LLAMA_RELEASES = "https://github.com/ggml-org/llama.cpp/releases"
 CHUNK = 1 << 20
 
@@ -194,17 +194,21 @@ def setup_llama(root, gpu):
         log("llama.cpp already installed, skipping. Delete %s to update it." % folder)
         return server
 
-    release = json.loads(fetch(LLAMA_API, "application/vnd.github+json"))
     driver_cuda = None if gpu in ("vulkan", "cpu") else nvidia_cuda_version()
-    assets = release["assets"]
-    if gpu in ("vulkan", "cpu"):
-        assets = [a for a in assets if "cuda" not in a["name"]]
-        if gpu == "cpu":
-            assets = [a for a in assets if "vulkan" not in a["name"]]
-    label, chosen = pick_llama_assets(assets, driver_cuda)
+    # The "latest" release is not always a binary one; take the newest with a Windows build.
+    label, chosen, release = None, [], {}
+    for release in json.loads(fetch(LLAMA_API, "application/vnd.github+json")):
+        assets = release.get("assets", [])
+        if gpu in ("vulkan", "cpu"):
+            assets = [a for a in assets if "cuda" not in a["name"]]
+            if gpu == "cpu":
+                assets = [a for a in assets if "vulkan" not in a["name"]]
+        label, chosen = pick_llama_assets(assets, driver_cuda)
+        if chosen and not release.get("draft"):
+            break
     if not chosen:
-        sys.exit("Error: no matching Windows build in llama.cpp %s. Download one from %s, extract it to %s and run setup again."
-                 % (release.get("tag_name"), LLAMA_RELEASES, folder))
+        sys.exit("Error: no recent llama.cpp release has a matching Windows build. Download one from %s, extract it to %s and run setup again."
+                 % (LLAMA_RELEASES, folder))
 
     log("Installing llama.cpp %s, %s build..." % (release.get("tag_name"), label))
     os.makedirs(folder, exist_ok=True)
