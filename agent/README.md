@@ -57,13 +57,14 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--workdir` | current folder | The only folder the file tools may use |
 | `--ctx` | `8192` | Must match the server's `-c`; older history is dropped to fit |
 | `--yes` | off | Approve writes and commands without asking |
-| `--think` | off | Turn on Qwen's thinking mode: better on hard tasks, slower, uses more context |
+| `--think` | off | Turn on the model's thinking mode: better on hard tasks, slower, uses more context |
+| `--temperature`, `--top-p` | 0.3 and 0.9; 0.6 and 0.95 with `--think` | Sampling. `start.py` passes the model's own values from `models.json` when it has them |
 
 ## Your notes
 
 Put runbooks, procedures, known fixes and names as `.md` or `.txt` files in the `notes` folder next to `agent.py` (or pass `--notes DIR`). The agent sees the list of files, searches them with `search_notes` before guessing, and opens one with `read_note`. `notes/ALWAYS.md` is loaded into every conversation, so keep it short. `notes/EXAMPLE.md` shows the format.
 
-`--think` turns on the model's reasoning and shows it, dimmed, before the answer. It's slower.
+`--think` turns on the model's reasoning and shows it, dimmed, before the answer. It's slower. In `models.json`, `"think": true` makes `start.py` always pass `--think` for that model (K2-Horizon-MoVA reasons before every answer), and `ctx`, `temperature` and `top_p` set its defaults.
 
 ## Notes
 

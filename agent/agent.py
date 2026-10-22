@@ -115,7 +115,7 @@ MAX_ALWAYS = 2000           # chars of ALWAYS.md put in the prompt
 
 
 class Agent:
-    def __init__(self, base_url, model, workdir, auto_approve, think, ctx=8192, notes=None):
+    def __init__(self, base_url, model, workdir, auto_approve, think, ctx=8192, notes=None, sampling=None):
         self.base_url = base_url.rstrip("/")
         self.notes_dir = os.path.realpath(notes or os.path.join(os.path.dirname(os.path.abspath(__file__)), "notes"))
         os.makedirs(self.notes_dir, exist_ok=True)
@@ -123,8 +123,9 @@ class Agent:
         self.workdir = os.path.realpath(workdir)
         self.auto_approve = auto_approve
         self.think = think
-        # ~3.5 chars per token, leaving room for tool schemas and the reply.
-        self.history_budget = int(ctx * 2.5)
+        self.sampling = sampling  # the model's recommended temperature and top_p, if it has them
+        # ~3.5 chars per token, leaving room for tool schemas and the reply (and the reasoning before it).
+        self.history_budget = int(ctx * (1.5 if think else 2.5))
         # The server is local; never route it through a system proxy.
         self.http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         self.stats = {}
@@ -205,7 +206,7 @@ class Agent:
 
     def chat(self):
         # Thinking mode uses Qwen's recommended sampling; otherwise stay close to the evidence.
-        sampling = {"temperature": 0.6, "top_p": 0.95} if self.think else {"temperature": 0.3, "top_p": 0.9}
+        sampling = self.sampling or ({"temperature": 0.6, "top_p": 0.95} if self.think else {"temperature": 0.3, "top_p": 0.9})
         body = dict({"model": self.model, "messages": self.messages, "tools": TOOLS, "top_k": 20}, **sampling)
         if not self.think:
             body["chat_template_kwargs"] = {"enable_thinking": False}
@@ -219,7 +220,8 @@ class Agent:
                 if "text/event-stream" not in (resp.headers.get("Content-Type") or ""):
                     data = json.load(resp)  # server ignored "stream"
                     self.add_timings(data.get("timings"))
-                    return dict(data["choices"][0]["message"], shown=False)
+                    choice = data["choices"][0]
+                    return dict(choice["message"], shown=False, finish=choice.get("finish_reason"))
                 return self.read_stream(resp)
         except urllib.error.HTTPError as e:
             raise RuntimeError("server returned %s: %s" % (e.code, e.read().decode("utf-8", "replace")[:500]))
@@ -239,6 +241,8 @@ class Agent:
         live = LiveText(self.stream_lead)
         calls = {}
         reasoning_open = False
+        held = ""  # whitespace at the end of the reasoning so far, printed only if more follows
+        finish = None
         for raw in resp:
             line = raw.decode("utf-8", "replace").strip()
             if not line.startswith("data:"):
@@ -251,14 +255,23 @@ class Agent:
                 self.add_timings(chunk["timings"])
             for choice in chunk.get("choices") or []:
                 delta = choice.get("delta") or {}
-                if delta.get("reasoning_content"):
+                finish = choice.get("finish_reason") or finish
+                thought = delta.get("reasoning_content")
+                if thought:
                     if not reasoning_open:
-                        print(dim("thinking: "), end="")
-                        reasoning_open = True
-                    print(dim(delta["reasoning_content"]), end="", flush=True)
+                        thought = thought.lstrip()
+                        if thought:
+                            print(self.stream_lead + dim("thinking: "), end="")
+                            reasoning_open = True
+                    body = thought.rstrip()
+                    if body:
+                        print(dim(held + body), end="", flush=True)
+                        held = ""
+                    held += thought[len(body):]
                 elif reasoning_open and (delta.get("content") or delta.get("tool_calls")):
                     print(flush=True)
-                    reasoning_open = False
+                    reasoning_open, held = False, ""
+                    live.lead = "\n"  # a blank line between the reasoning and the answer
                 if delta.get("content"):
                     live.feed(delta["content"])
                 for tc in delta.get("tool_calls") or []:
@@ -271,7 +284,7 @@ class Agent:
         if reasoning_open:
             print(flush=True)
         live.finish()
-        message = {"role": "assistant", "content": live.text, "shown": live.shown > 0}
+        message = {"role": "assistant", "content": live.text, "shown": live.shown > 0, "finish": finish}
         if calls:
             message["tool_calls"] = [calls[i] for i in sorted(calls)]
         return message
@@ -306,6 +319,9 @@ class Agent:
                                   **({"tool_calls": calls} if calls else {})})
             if not calls:
                 self.answer_shown = msg.get("shown", False)
+                if msg.get("finish") == "length":
+                    note = "(The reply was cut off: it filled the context. Type /reset, or start Axis with a larger --ctx.)"
+                    print(dim(note))
                 return content
             if content and not msg.get("shown"):
                 print(dim(content))
@@ -704,13 +720,19 @@ def main():
     p.add_argument("--ctx", type=int, default=8192, help="context size the server was started with (-c)")
     p.add_argument("--think", action="store_true", help="enable the model's thinking mode (slower; shows its reasoning)")
     p.add_argument("--notes", help="notes folder (default: the notes folder next to agent.py)")
+    p.add_argument("--temperature", type=float, help="sampling temperature (default: 0.3, or 0.6 with --think)")
+    p.add_argument("--top-p", type=float, help="nucleus sampling (default: 0.9, or 0.95 with --think)")
     a = p.parse_args()
 
-    agent = Agent(a.url, a.model, a.workdir, a.yes, a.think, a.ctx, a.notes)
+    sampling = None
+    if a.temperature is not None or a.top_p is not None:
+        sampling = {"temperature": 0.6 if a.temperature is None else a.temperature,
+                    "top_p": 0.95 if a.top_p is None else a.top_p}
+    agent = Agent(a.url, a.model, a.workdir, a.yes, a.think, a.ctx, a.notes, sampling)
     try:
         if a.task:
             answer = agent.run(" ".join(a.task))
-            if not agent.answer_shown:
+            if not agent.answer_shown and answer:
                 print(render_bold(answer, close=True)[0])
             if agent.speed():
                 print(dim(agent.speed()))
@@ -728,7 +750,7 @@ def main():
                 try:
                     print()
                     answer = agent.run(task)
-                    if not agent.answer_shown:
+                    if not agent.answer_shown and answer:
                         print(render_bold(answer, close=True)[0])
                     if agent.speed():
                         print(dim(agent.speed()))

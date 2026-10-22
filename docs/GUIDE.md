@@ -59,6 +59,7 @@ If you've downloaded more than one model, Axis asks which one to use. Press Ente
 | Key | Model | Download | Notes |
 | --- | --- | --- | --- |
 | `35b` | Qwen3.6-35B-A3B | [12 parts, 22.1 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m) | **Recommended.** Fast and good at terminal tasks. Only about 3B of its 35B parameters work on each word, so it's fast even without a graphics card. |
+| `k2` | K2-Horizon-MoVA-36B-A4B | [12 parts, 22.4 GB](https://github.com/AOSPAndroid/Axis/releases/tag/k2-horizon-mova-36b-a4b-q4-k-m) | The best at terminal tasks and the least likely to make answers up. It always thinks before it answers, and you see its reasoning in grey, so answers take longer to start. About 4B of its 36B parameters work on each word. |
 | `27b` | Qwen3.8-27B | [9 parts, 16.5 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-q4-k-m) | The most accurate, but slow: roughly 2 words a second on a processor, 4–6 with an 8 GB graphics card. |
 | `gemma` | Gemma 4 26B-A4B | [8 parts, 14.4 GB](https://github.com/AOSPAndroid/Axis/releases/tag/gemma-4-26b-a4b-qat-q4-0) | Google's model. Fast. |
 | `9b-distill` | Qwen3.8-9B distill | [4 parts, 5.8 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-9b-q4-k-m) | Small; fits entirely on an 8 GB graphics card. Makes more mistakes. |
@@ -74,7 +75,7 @@ python start.py --model 35b
 **Which model on which PC:**
 
 - **PC without a usable graphics card:** Qwen3.6-35B-A3B. It's faster there than the 9B models, as well as smarter.
-- **PC with an 8 GB graphics card:** Qwen3.6-35B-A3B for everyday use; Qwen3.8-27B for hard jobs.
+- **PC with an 8 GB graphics card:** Qwen3.6-35B-A3B for everyday use; K2-Horizon-MoVA for hard jobs.
 
 ## Everyday use
 
@@ -141,6 +142,8 @@ For tricky problems, start Axis with thinking on. The model then reasons before 
 
 It's slower, so it's off by default.
 
+**K2-Horizon-MoVA always thinks.** Axis turns thinking on for it automatically and shows the reasoning in grey before each answer, so you can follow what it's checking and why. It also gets a larger context (16384) so the reasoning fits.
+
 ## Options
 
 Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened in the `local-agent` folder.
@@ -151,7 +154,7 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | `--think` | Turn on reasoning, shown in grey. Slower. |
 | `--cpu` | Use only the processor, even if a graphics card is found. |
 | `--gpu` | Try the graphics card even if it reports less than 4 GB. |
-| `--ctx 4096` | Use a smaller context to save memory. The default is 8192. |
+| `--ctx 4096` | Use a smaller context to save memory. The default is 8192, or 16384 for K2-Horizon-MoVA. |
 | `--workdir FOLDER` | The folder Axis may read and write files in. Default: `workspace` next to `start.py`. |
 | `--notes FOLDER` | Use a different notes folder. |
 | `--yes` | Approve every change without asking. Not recommended on work PCs. |
@@ -165,7 +168,8 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | "The model is not ready yet" | One or more parts are missing or still downloading. Axis lists them. Download them and start again. |
 | It stops while loading the model | Look at `server.log` in the `local-agent` folder. For memory errors, try `--ctx 4096`, or a smaller model. |
 | Answers are slow | Check the speed line. If "wrote" is under about 8 per second, use Qwen3.6-35B-A3B. On a PC with a weak graphics card, compare with `--cpu`. |
-| The answer is wrong or made up | Ask it to check with a command, add the facts to your notes, or use Qwen3.8-27B or `--think` for hard questions. |
+| The answer is wrong or made up | Ask it to check with a command, add the facts to your notes, or use K2-Horizon-MoVA or `--think` for hard questions. |
+| "The reply was cut off" | The model's reasoning filled the context. Type `/reset`, or start Axis with a larger `--ctx`, for example `--ctx 32768`. |
 
 ## Updating
 

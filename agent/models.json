@@ -23,6 +23,20 @@
     ]
   },
   {
+    "key": "k2",
+    "name": "K2-Horizon-MoVA-36B-A4B",
+    "note": "best at terminal tasks; thinks first (shown in grey)",
+    "tag": "k2-horizon-mova-36b-a4b-q4-k-m",
+    "file": "K2-Horizon-MoVA-36B-A4B-Q4_K_M.gguf",
+    "size": 22368011616,
+    "sha256": "513dd78590ac29135a7cea5a99865d57d65291b1f857a8904fb9b1878d4f4cbd",
+    "think": true,
+    "ctx": 16384,
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "parts": []
+  },
+  {
     "key": "27b",
     "name": "Qwen3.8-27B",
     "note": "newest; best at terminal tasks, but slow",

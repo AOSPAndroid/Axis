@@ -287,7 +287,7 @@ def main():
     p = argparse.ArgumentParser(description="Start llama-server and Axis.")
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
                    help="folder the agent works in (default: the workspace folder here)")
-    p.add_argument("--ctx", type=int, default=8192, help="context size in tokens")
+    p.add_argument("--ctx", type=int, help="context size in tokens (default: 8192, or the model's own setting)")
     p.add_argument("--model", choices=list(MODELS), help="which model to use (default: ask when several are present)")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--cpu", action="store_true", help="always run on the processor")
@@ -295,7 +295,17 @@ def main():
     a, agent_args = p.parse_known_args()
 
     key, model = prepare_model(a.model)
+    m = MODELS[key]
     log("Model: %s" % os.path.basename(model))
+    ctx = a.ctx or m.get("ctx") or 8192
+    if m.get("think") and "--think" not in agent_args:
+        agent_args.append("--think")  # this model always reasons first
+    think = "--think" in agent_args
+    if think:
+        log("Thinking: on. The model's reasoning is shown in grey before each answer.")
+    for opt, field in (("--temperature", "temperature"), ("--top-p", "top_p")):
+        if field in m and opt not in agent_args:
+            agent_args += [opt, str(m[field])]
     os.makedirs(a.workdir, exist_ok=True)
 
     proc = None
@@ -313,7 +323,7 @@ def main():
                 continue
             where = "graphics card + processor" if build == "vulkan" else "processor"
             log("Starting llama-server (%s), loading the model" % where)
-            proc = start_server(exe, model, a.ctx, build == "vulkan", think="--think" in agent_args)
+            proc = start_server(exe, model, ctx, build == "vulkan", think=think)
             if proc:
                 break
             if build == "vulkan":
@@ -324,7 +334,7 @@ def main():
     try:
         log()
         subprocess.call([sys.executable, os.path.join(HERE, "agent.py"),
-                         "--workdir", a.workdir, "--ctx", str(a.ctx)] + agent_args)
+                         "--workdir", a.workdir, "--ctx", str(ctx)] + agent_args)
     except KeyboardInterrupt:
         pass
     finally:

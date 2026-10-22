@@ -11,6 +11,7 @@ Contents: the agent, a launcher, and llama.cpp builds for the processor
    (https://github.com/AOSPAndroid/Axis/releases):
 
    Qwen3.6-35B-A3B              22.1 GB, 12 parts  fast; good at terminal tasks
+   K2-Horizon-MoVA-36B-A4B      22.4 GB, 12 parts  best at terminal tasks; thinks first
    Qwen3.8-27B                  16.5 GB,  9 parts  newest; best at terminal tasks, slow
    Gemma 4 26B-A4B              14.4 GB,  8 parts  Google; fast
    Qwen3.6-35B-A3B abliterated  21.2 GB, 12 parts  fast; community edit without refusals
@@ -28,7 +29,7 @@ Contents: the agent, a launcher, and llama.cpp builds for the processor
    stop both.
 
 To skip the question: python start.py --model 35b
-(keys: 35b, 27b, gemma, 35b-abliterated, 9b-abliterated, 9b-distill)
+(keys: 35b, k2, 27b, gemma, 35b-abliterated, 9b-abliterated, 9b-distill)
 
 Notes: put your runbooks, procedures, known fixes and names as .md or .txt
 files in the "notes" folder. The agent searches them before guessing, and
@@ -36,7 +37,8 @@ always reads notes\ALWAYS.md (keep it short). notes\EXAMPLE.md shows the
 format. Re-extracting the zip only replaces EXAMPLE.md.
 
 To see the model's reasoning, start with: "Start Agent.bat" --think
-(slower: it thinks before every answer).
+(slower: it thinks before every answer). K2-Horizon-MoVA always thinks,
+and its reasoning is always shown in grey.
 
 The agent works in the "workspace" folder next to start.py. To use another
 folder: python start.py --workdir C:\path\to\folder

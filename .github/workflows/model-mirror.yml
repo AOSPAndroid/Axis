@@ -19,6 +19,17 @@ jobs:
       max-parallel: 2
       matrix:
         include:
+          - tag: k2-horizon-mova-36b-a4b-q4-k-m
+            title: K2-Horizon-MoVA-36B-A4B Q4_K_M (thinks before answering, 22.4 GB)
+            hf_repo: IFM/K2-Horizon-MoVA-36B-A4B-GGUF
+            hf_rev: 00cce3151bdce384661cb33603853ccfe6209de9
+            file: K2-Horizon-MoVA-36B-A4B-Q4_K_M.gguf
+            size: '22368011616'
+            sha256: 513dd78590ac29135a7cea5a99865d57d65291b1f857a8904fb9b1878d4f4cbd
+            about: >-
+              K2-Horizon-MoVA-36B-A4B (September 2026), quantized by its makers, IFM. Mixture of
+              experts, about 4B active per token. It reasons before every answer. Needs llama.cpp
+              b11454 or newer.
           - tag: qwen3.8-27b-q4-k-m
             title: Qwen3.8-27B Q4_K_M (best at terminal tasks, 16.5 GB)
             hf_repo: unsloth/Qwen3.8-27B-GGUF
