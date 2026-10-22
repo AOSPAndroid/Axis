@@ -249,18 +249,22 @@ def server_ready():
         return False
 
 
-def start_server(exe, model, ctx, gpu, think=False):
+def start_server(exe, model, ctx, gpu, think=False, alias=None):
     log_path = os.path.join(HERE, "server.log")
     cmd = [exe, "-m", model, "-c", str(ctx), "--jinja", "--host", "127.0.0.1", "--port", str(PORT),
            # On a graphics card llama.cpp fits as many layers (or, for mixture-of-experts
            # models, the shared layers first) as free memory allows; the rest stays in RAM.
            "-ngl", "auto" if gpu else "0", "--temp", "0.6", "--top-p", "0.95", "--top-k", "20"]
+    cmd += ["--alias", alias or os.path.splitext(os.path.basename(model))[0]]
     if not think:
         # Some chat templates ignore the per-request switch; a zero budget ends any thinking at once.
         cmd += ["--reasoning", "off", "--reasoning-budget", "0"]
     with open(log_path, "w") as log_file:
         try:
-            proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=os.path.dirname(exe))
+            # Ctrl+C belongs to the chat, not the model server sharing its console.
+            flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=os.path.dirname(exe),
+                                    creationflags=flags, start_new_session=os.name != "nt")
         except OSError as e:
             log("  could not start %s: %s" % (exe, e))
             return None
@@ -283,6 +287,26 @@ def start_server(exe, model, ctx, gpu, think=False):
     return None
 
 
+def wait_for_agent(command):
+    child = subprocess.Popen(command)
+    while True:
+        try:
+            return child.wait()
+        except KeyboardInterrupt:
+            # The child receives the same console event and cancels its request.
+            continue
+
+
+def server_model():
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open("http://127.0.0.1:%d/v1/models" % PORT, timeout=5) as response:
+            entries = json.load(response).get("data", [])
+        return entries[0]["id"] if len(entries) == 1 else None
+    except (OSError, ValueError, KeyError):
+        return None
+
+
 def main():
     p = argparse.ArgumentParser(description="Start llama-server and the local agent.")
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
@@ -295,12 +319,16 @@ def main():
     a, agent_args = p.parse_known_args()
 
     key, model = prepare_model(a.model)
+    alias = MODELS[key]["name"]
     log("Model: %s" % os.path.basename(model))
     os.makedirs(a.workdir, exist_ok=True)
 
     proc = None
     if server_ready():
         log("Using the llama-server already running on port %d." % PORT)
+        alias = server_model()
+        if not alias:
+            sys.exit("Cannot identify the running server's model. Close it and restart this launcher, or run agent.py directly with its --model ID.")
     else:
         adapters = gpus()
         log("Graphics: %s" % (", ".join(name for name, _ in adapters) or "unknown"))
@@ -313,7 +341,7 @@ def main():
                 continue
             where = "graphics card + processor" if build == "vulkan" else "processor"
             log("Starting llama-server (%s), loading the model" % where)
-            proc = start_server(exe, model, a.ctx, build == "vulkan", think="--think" in agent_args)
+            proc = start_server(exe, model, a.ctx, build == "vulkan", think="--think" in agent_args, alias=alias)
             if proc:
                 break
             if build == "vulkan":
@@ -323,10 +351,8 @@ def main():
 
     try:
         log("\nAgent working folder: %s" % os.path.abspath(a.workdir))
-        subprocess.call([sys.executable, os.path.join(HERE, "agent.py"),
-                         "--workdir", a.workdir, "--ctx", str(a.ctx)] + agent_args)
-    except KeyboardInterrupt:
-        pass
+        return wait_for_agent([sys.executable, os.path.join(HERE, "agent.py"), "--model", alias,
+                               "--workdir", a.workdir, "--ctx", str(a.ctx)] + agent_args)
     finally:
         if proc:
             proc.terminate()
@@ -337,4 +363,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

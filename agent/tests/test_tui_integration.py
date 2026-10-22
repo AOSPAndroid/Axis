@@ -1,0 +1,173 @@
+"""Exercise chat/terminal boundaries with no model server or remote Windows PC."""
+import json
+import os
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+from unittest.mock import MagicMock, Mock, patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import agent
+import start
+
+
+def event(delta=None, finish_reason=None):
+    return ("data: " + json.dumps({"choices": [{"delta": delta or {}, "finish_reason": finish_reason}]}) + "\n").encode("utf-8")
+
+
+def tool_call(identifier, name="list_dir", arguments='{"path":"."}'):
+    return {"id": identifier, "type": "function", "function": {"name": name, "arguments": arguments}}
+
+
+class TUIIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        self.ui = MagicMock()
+        with patch.object(agent, "system_facts", return_value=("Test PC", False)):
+            self.agent = agent.Agent("http://127.0.0.1:8080/v1", "test-local-model", str(self.root),
+                                     False, False, notes=str(self.root / "notes"),
+                                     state_dir=str(self.root / "state"), ui=self.ui)
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def test_cancelling_a_tool_batch_preserves_one_result_per_call(self):
+        calls = [tool_call("first"), tool_call("interrupted"), tool_call("not_started")]
+        self.agent.chat = Mock(return_value={"role": "assistant", "content": "", "tool_calls": calls})
+        self.agent.call_tool = Mock(side_effect=["first action finished", KeyboardInterrupt()])
+
+        with self.assertRaises(KeyboardInterrupt):
+            self.agent.run("Inspect the folder")
+
+        replies = [m for m in self.agent.messages if m["role"] == "tool"]
+        self.assertEqual([m["tool_call_id"] for m in replies], ["first", "interrupted", "not_started"])
+        self.assertEqual(replies[0]["content"], "first action finished")
+        self.assertIn("interrupt", replies[1]["content"].lower())
+        self.assertIn("not", replies[2]["content"].lower())
+        self.assertEqual(self.agent.call_tool.call_count, 2)
+
+        # The next user request must not inherit unanswered assistant tool calls.
+        self.agent.chat = Mock(return_value={"role": "assistant", "content": "Ready", "shown": False})
+        self.assertEqual(self.agent.run("What next?"), "Ready")
+
+    def test_result_is_saved_before_terminal_rendering_can_fail(self):
+        self.agent.chat = Mock(return_value={"role": "assistant", "content": "", "tool_calls": [tool_call("changed")]})
+        self.agent.call_tool = Mock(return_value="The requested action completed")
+        self.ui.tool_result.side_effect = RuntimeError("Terminal rendering failed")
+
+        with self.assertRaisesRegex(RuntimeError, "Terminal rendering failed"):
+            self.agent.run("Perform the selected action")
+
+        replies = [m for m in self.agent.messages if m["role"] == "tool"]
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(replies[0]["content"], "The requested action completed")
+        saved = self.root / "state" / "outputs" / (self.agent.last_output_id + ".txt")
+        self.assertEqual(saved.read_text(encoding="utf-8"), "The requested action completed")
+        self.agent.call_tool.assert_called_once()
+
+    def test_partial_tool_call_at_output_limit_is_never_executed(self):
+        stream = [
+            event({"tool_calls": [{"index": 0, "id": "partial", "type": "function", "function": {
+                "name": "run_command", "arguments": '{"command":"Restart-Computer'}}]}),
+            event(finish_reason="length"),
+            b"data: [DONE]\n",
+        ]
+        self.agent.chat = Mock(side_effect=lambda: self.agent.read_stream(iter(stream)))
+        self.agent.call_tool = Mock()
+
+        with self.assertRaises(RuntimeError):
+            self.agent.run("An unfinished request")
+
+        self.agent.call_tool.assert_not_called()
+        self.ui.end_response.assert_called()
+        self.ui.end_thinking.assert_called()
+
+    def test_raw_eof_without_completion_is_reported_as_incomplete(self):
+        with self.assertRaises(RuntimeError):
+            self.agent.read_stream(iter([event({"content": "Partial answer"})]))
+        self.ui.end_response.assert_called()
+
+    def test_stream_interruption_closes_thinking_and_response_channels(self):
+        def interrupted():
+            yield event({"reasoning_content": "Considering the current state"})
+            raise KeyboardInterrupt()
+
+        with self.assertRaises(KeyboardInterrupt):
+            self.agent.read_stream(interrupted())
+        self.ui.end_thinking.assert_called()
+        self.ui.end_response.assert_called()
+
+    def test_fragmented_tool_arguments_are_assembled_before_dispatch(self):
+        stream = [
+            event({"tool_calls": [{"index": 0, "id": "complete", "type": "function", "function": {
+                "name": "list_", "arguments": '{"path":'}}]}),
+            event({"tool_calls": [{"index": 0, "function": {"name": "dir", "arguments": '"."}'}}]}),
+            event(finish_reason="tool_calls"),
+            b"data: [DONE]\n",
+        ]
+        result = self.agent.read_stream(iter(stream))
+        self.assertEqual(result["tool_calls"], [tool_call("complete")])
+
+    def test_normal_stop_without_done_sentinel_is_a_valid_response(self):
+        result = self.agent.read_stream(iter([event({"content": "Hello"}), event(finish_reason="stop")]))
+        self.assertEqual(result["content"], "Hello")
+        self.ui.end_response.assert_called()
+
+    def test_local_status_jobs_help_and_exit_do_not_invoke_the_model(self):
+        self.agent.chat = Mock()
+        for command in ("/help", "/status", "/jobs"):
+            with self.subTest(command=command):
+                self.assertTrue(agent.handle_command(self.agent, self.ui, command, []))
+        self.assertFalse(agent.handle_command(self.agent, self.ui, "/exit", []))
+        self.agent.chat.assert_not_called()
+        self.ui.help.assert_called_once()
+        self.ui.config.assert_called()
+        self.ui.jobs.assert_called()
+
+    def test_reset_keeps_saved_output_available(self):
+        self.agent.save_output("Saved inspection result")
+        output_id = self.agent.last_output_id
+        self.agent.messages.append({"role": "user", "content": "Old request"})
+        self.assertTrue(agent.handle_command(self.agent, self.ui, "/reset", []))
+        self.assertEqual(len(self.agent.messages), 1)
+        saved = self.root / "state" / "outputs" / (output_id + ".txt")
+        self.assertEqual(saved.read_text(encoding="utf-8"), "Saved inspection result")
+
+
+class LauncherIntegrationTests(unittest.TestCase):
+    def test_parent_interrupt_does_not_stop_a_child_that_is_still_chatting(self):
+        child = MagicMock()
+        child.wait.side_effect = [KeyboardInterrupt(), 0]
+        command = [sys.executable, "agent.py"]
+        with patch.object(start.subprocess, "Popen", return_value=child) as popen:
+            self.assertEqual(start.wait_for_agent(command), 0)
+        self.assertEqual(child.wait.call_count, 2)
+        popen.assert_called_once()
+        self.assertEqual(popen.call_args.args[0], command)
+        child.terminate.assert_not_called()
+        child.kill.assert_not_called()
+
+    def test_owned_model_server_is_isolated_from_chat_console_interrupts(self):
+        with tempfile.TemporaryDirectory() as folder:
+            process = MagicMock()
+            process.poll.return_value = None
+            with patch.object(start, "HERE", folder), patch.object(start, "server_ready", return_value=True), patch.object(start.subprocess, "Popen", return_value=process) as popen:
+                result = start.start_server(str(Path(folder) / "llama-server.exe"),
+                                            str(Path(folder) / "model.gguf"), 16384, False,
+                                            alias="selected-model")
+            self.assertIs(result, process)
+            command = popen.call_args.args[0]
+            self.assertEqual(command[command.index("--alias") + 1], "selected-model")
+            options = popen.call_args.kwargs
+            if os.name == "nt":
+                flags = options.get("creationflags", 0)
+                self.assertTrue(flags & start.subprocess.CREATE_NEW_PROCESS_GROUP)
+                self.assertTrue(flags & start.subprocess.CREATE_NO_WINDOW)
+            else:
+                self.assertTrue(options.get("start_new_session"))
+
+
+if __name__ == "__main__":
+    unittest.main()

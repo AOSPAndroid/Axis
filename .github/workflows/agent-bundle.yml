@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp agent/agent.py agent/it_tools.py agent/it_windows.ps1 agent/start.py agent/models.json "agent/Start Agent.bat" bundle/local-agent/
+          cp agent/agent.py agent/it_tools.py agent/it_windows.ps1 agent/terminal_ui.py agent/start.py agent/models.json "agent/Start Agent.bat" bundle/local-agent/
           mkdir -p bundle/local-agent/notes && cp agent/notes/EXAMPLE.md bundle/local-agent/notes/
           cp agent/BUNDLE-README.txt bundle/local-agent/README.txt
           (cd bundle && zip -qr ../local-agent-windows.zip local-agent)

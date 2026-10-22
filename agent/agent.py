@@ -17,11 +17,13 @@ import re
 import subprocess
 import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 import uuid
 
 from it_tools import DEFAULT_PACKAGE_REPO, ITTools, TOOLS as IT_TOOLS, TOOL_NAMES as IT_TOOL_NAMES
+from terminal_ui import TerminalUI
 
 MAX_TOOL_OUTPUT = 3000   # chars of tool output sent back to the model (start and end kept)
 MAX_STEPS = 30           # model/tool rounds per task (configurable)
@@ -135,7 +137,8 @@ MAX_ALWAYS = 2000           # chars of ALWAYS.md put in the prompt
 
 class Agent:
     def __init__(self, base_url, model, workdir, auto_approve, think, ctx=16384, notes=None,
-                 package_repo=None, state_dir=None, max_steps=MAX_STEPS, deployment_timeout=3600):
+                 package_repo=None, state_dir=None, max_steps=MAX_STEPS, deployment_timeout=3600, ui=None):
+        self.ui = ui or TerminalUI()
         self.base_url = base_url.rstrip("/")
         self.notes_dir = os.path.realpath(notes or os.path.join(os.path.dirname(os.path.abspath(__file__)), "notes"))
         os.makedirs(self.notes_dir, exist_ok=True)
@@ -146,6 +149,11 @@ class Agent:
         if ctx < 4096 or max_steps < 1 or max_steps > 200:
             raise ValueError("Use at least 4096 context tokens and 1 to 200 steps")
         self.max_steps = max_steps
+        self.ctx = ctx
+        self.last_output_id = None
+        self.last_duration = None
+        self.last_model = None
+        self._active_tool_call_id = None
         self.max_reply = min(4096 if think else 2048, ctx // 3)
         # Conservative character estimate; reserve the tool schemas and reply.
         self.history_budget = max(0, int((ctx - self.max_reply) * 3) - len(json.dumps(TOOLS)))
@@ -247,6 +255,9 @@ class Agent:
                 if "text/event-stream" not in (resp.headers.get("Content-Type") or ""):
                     data = json.load(resp)  # server ignored "stream"
                     self.add_timings(data.get("timings"))
+                    if data["choices"][0].get("finish_reason") == "length":
+                        raise RuntimeError("Model response reached its output limit. No incomplete tool calls were executed; use more context or split the task.")
+                    self.last_model = data.get("model") or self.last_model
                     return dict(data["choices"][0]["message"], shown=False)
                 return self.read_stream(resp)
         except urllib.error.HTTPError as e:
@@ -264,41 +275,54 @@ class Agent:
 
     def read_stream(self, resp):
         """Collect a streamed reply, printing visible text as it arrives."""
-        live = LiveText()
+        live = LiveText(self.ui)
         calls = {}
         reasoning_open = False
-        for raw in resp:
-            line = raw.decode("utf-8", "replace").strip()
-            if not line.startswith("data:"):
-                continue
-            payload = line[5:].strip()
-            if payload == "[DONE]":
-                break
-            chunk = json.loads(payload)
-            if chunk.get("timings"):
-                self.add_timings(chunk["timings"])
-            for choice in chunk.get("choices") or []:
-                delta = choice.get("delta") or {}
-                if delta.get("reasoning_content"):
-                    if not reasoning_open:
-                        print(dim("thinking: "), end="")
-                        reasoning_open = True
-                    print(dim(delta["reasoning_content"]), end="", flush=True)
-                elif reasoning_open and (delta.get("content") or delta.get("tool_calls")):
-                    print(flush=True)
-                    reasoning_open = False
-                if delta.get("content"):
-                    live.feed(delta["content"])
-                for tc in delta.get("tool_calls") or []:
-                    slot = calls.setdefault(tc.get("index", 0), {"id": "", "type": "function",
-                                                                 "function": {"name": "", "arguments": ""}})
-                    slot["id"] = tc.get("id") or slot["id"]
-                    fn = tc.get("function") or {}
-                    slot["function"]["name"] += fn.get("name") or ""
-                    slot["function"]["arguments"] += fn.get("arguments") or ""
-        if reasoning_open:
-            print(flush=True)
-        live.finish()
+        finished = False
+        completed = False
+        try:
+            for raw in resp:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line.startswith("data:"):
+                    continue
+                payload = line[5:].strip()
+                if payload == "[DONE]":
+                    finished = True
+                    break
+                chunk = json.loads(payload)
+                self.last_model = chunk.get("model") or self.last_model
+                if chunk.get("timings"):
+                    self.add_timings(chunk["timings"])
+                for choice in chunk.get("choices") or []:
+                    reason = choice.get("finish_reason")
+                    if reason == "length":
+                        raise RuntimeError("Model response reached its output limit. No incomplete tool calls were executed; use more context or split the task.")
+                    if reason:
+                        finished = True
+                    delta = choice.get("delta") or {}
+                    if delta.get("reasoning_content"):
+                        if not reasoning_open:
+                            self.ui.begin_thinking()
+                            reasoning_open = True
+                        self.ui.write_thinking(delta["reasoning_content"])
+                    elif reasoning_open and (delta.get("content") or delta.get("tool_calls")):
+                        self.ui.end_thinking()
+                        reasoning_open = False
+                    if delta.get("content"):
+                        live.feed(delta["content"])
+                    for tc in delta.get("tool_calls") or []:
+                        slot = calls.setdefault(tc.get("index", 0), {"id": "", "type": "function",
+                                                                     "function": {"name": "", "arguments": ""}})
+                        slot["id"] = tc.get("id") or slot["id"]
+                        fn = tc.get("function") or {}
+                        slot["function"]["name"] += fn.get("name") or ""
+                        slot["function"]["arguments"] += fn.get("arguments") or ""
+            if not finished:
+                raise RuntimeError("Model stream ended unexpectedly. No incomplete tool calls were executed; try the request again.")
+            completed = True
+        finally:
+            self.ui.end_thinking()
+            live.finish(final=completed)
         message = {"role": "assistant", "content": live.text, "shown": live.shown > 0}
         if calls:
             message["tool_calls"] = [calls[i] for i in sorted(calls)]
@@ -322,9 +346,37 @@ class Agent:
         self.stats = {}
         self.answer_shown = False
         self.messages.append({"role": "user", "content": task})
+        started = time.monotonic()
+        try:
+            return self._run_rounds()
+        except BaseException:
+            self.repair_pending_calls()
+            raise
+        finally:
+            self.last_duration = time.monotonic() - started
+            self._active_tool_call_id = None
+
+    def repair_pending_calls(self):
+        """Keep history valid when Ctrl+C or a display/storage error interrupts a batch."""
+        for index, message in enumerate(self.messages):
+            if message.get("role") != "assistant" or not message.get("tool_calls"):
+                continue
+            end = next((i for i in range(index + 1, len(self.messages)) if self.messages[i].get("role") != "tool"), len(self.messages))
+            answered = {m.get("tool_call_id") for m in self.messages[index + 1:end]}
+            missing = [c for c in message["tool_calls"] if c.get("id", "") not in answered]
+            for call in reversed(missing):
+                interrupted = call.get("id", "") == self._active_tool_call_id
+                description = ("Interrupted while running this call. Its outcome may be unknown; inspect current state and saved IT jobs before retrying a change."
+                               if interrupted else "Not run: the request was interrupted before this call started.")
+                self.messages.insert(end, {"role": "tool", "tool_call_id": call.get("id", ""),
+                                           "name": call.get("function", {}).get("name", ""),
+                                           "content": description})
+
+    def _run_rounds(self):
         for _ in range(self.max_steps):
             self.trim_history()
-            msg = self.chat()
+            with self.ui.status("Thinking" if self.think else "Working"):
+                msg = self.chat()
             content = strip_thinking(msg.get("content") or "")
             calls = msg.get("tool_calls") or []
             if not calls:
@@ -335,7 +387,7 @@ class Agent:
                 self.answer_shown = msg.get("shown", False)
                 return content
             if content and not msg.get("shown"):
-                print(dim(content))
+                self.ui.assistant(content)
             for call in calls:
                 name = call["function"]["name"]
                 args = call["function"].get("arguments") or {}
@@ -344,21 +396,32 @@ class Agent:
                         args = json.loads(args) if args.strip() else {}
                     except json.JSONDecodeError:
                         args = None
-                print(cyan("-> %s(%s)" % (name, preview_args(args))))
-                result = self.call_tool(name, args)
-                print(dim(truncate(result, 400)))
+                self.ui.tool_start(name, args)
+                started = time.monotonic()
+                self._active_tool_call_id = call.get("id", "")
+                with self.ui.status("Running " + name.replace("_", " ")):
+                    result = self.call_tool(name, args)
+                saved = self.save_output(result)
                 self.messages.append({"role": "tool", "tool_call_id": call.get("id", ""),
-                                      "name": name, "content": self.save_output(result)})
+                                      "name": name, "content": saved})
+                self._active_tool_call_id = None
+                self.ui.tool_result(name, result, time.monotonic() - started, output_id=self.last_output_id)
         return "Stopped after %d rounds without finishing. Background IT jobs continue; inspect them with it_job_status." % self.max_steps
 
     def save_output(self, result):
-        if len(result) <= MAX_TOOL_OUTPUT:
-            return result
         output_id = uuid.uuid4().hex
         folder = os.path.join(self.state_dir, "outputs")
-        os.makedirs(folder, exist_ok=True)
-        with open(os.path.join(folder, output_id + ".txt"), "w", encoding="utf-8") as out:
-            out.write(result)
+        self.last_output_id = None
+        try:
+            os.makedirs(folder, exist_ok=True)
+            with open(os.path.join(folder, output_id + ".txt"), "w", encoding="utf-8") as out:
+                out.write(result)
+        except OSError as error:
+            self.ui.error("Could not save full tool output: " + str(error))
+            return shorten(result, MAX_TOOL_OUTPUT)
+        self.last_output_id = output_id
+        if len(result) <= MAX_TOOL_OUTPUT:
+            return result
         pointer = "\nFull result saved: output_id=%s, characters=%d. Use read_tool_output to read omitted sections." % (output_id, len(result))
         return shorten(result, MAX_TOOL_OUTPUT - len(pointer)) + pointer
 
@@ -438,7 +501,7 @@ class Agent:
                     if proc.returncode == NEEDS_APPROVAL and b"__NEEDS_APPROVAL__" in proc.stdout:
                         proc = None
                     else:
-                        print(dim("(read-only: ran without asking)"))
+                        self.ui.notice("Read-only command; approval was not needed")
                 if proc is None:
                     if not self.confirm("run: %s" % command):
                         return "User declined to run the command."
@@ -462,8 +525,7 @@ class Agent:
     def confirm(self, action):
         if self.auto_approve:
             return True
-        answer = input(yellow("Allow %s? [y/N] " % action)).strip().lower()
-        return answer in ("y", "yes")
+        return self.ui.confirm(action)
 
 
 # ---- local system ----------------------------------------------------------
@@ -632,7 +694,8 @@ class LiveText:
     """Prints streamed model text, hiding <think> blocks and tool-call markup like strip_thinking does."""
     TAGS = ("<think>", "</think>", "<tool_call>", "<function=")
 
-    def __init__(self):
+    def __init__(self, ui=None):
+        self.ui = ui
         self.text = ""
         self.shown = 0
         self.bold = False
@@ -660,12 +723,18 @@ class LiveText:
 
     def show(self, v):
         if len(v) > self.shown:
-            out, self.bold = render_bold(v[self.shown:], self.bold)
-            print(out, end="", flush=True)
+            if self.ui:
+                self.ui.write_response(v[self.shown:])
+            else:
+                out, self.bold = render_bold(v[self.shown:], self.bold)
+                print(out, end="", flush=True)
             self.shown = len(v)
 
-    def finish(self):
-        self.show(self.visible(final=True).rstrip())
+    def finish(self, final=True):
+        self.show(self.visible(final=final).rstrip())
+        if self.ui:
+            self.ui.end_response()
+            return
         if self.bold:
             print(render_bold("", True, close=True)[0], end="")
             self.bold = False
@@ -752,9 +821,98 @@ def _color(code):
 dim, cyan, yellow = _color("2"), _color("36"), _color("33")
 
 
-def main():
-    if os.name == "nt":
-        os.system("")  # enable ANSI colours in the Windows console
+def show_banner(agent, ui):
+    ui.banner(model=agent.last_model or agent.model, workdir=agent.workdir, ctx=agent.ctx,
+              thinking=agent.think, auto_approve=agent.auto_approve, package_repo=str(agent.it.repository))
+
+
+def saved_id(agent, folder, prefix=None):
+    directory = os.path.join(agent.state_dir, folder)
+    suffix = ".txt" if folder == "outputs" else ".json"
+    if prefix is None:
+        prefix = agent.last_output_id
+        if prefix is None:
+            paths = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(suffix)] if os.path.isdir(directory) else []
+            if not paths:
+                raise ValueError("No saved output yet")
+            return os.path.basename(max(paths, key=os.path.getmtime))[:-len(suffix)]
+    if not re.fullmatch(r"[a-f0-9]{6,32}", prefix or ""):
+        raise ValueError("Use a saved ID or its first 6 or more hexadecimal characters")
+    matches = [f[:-len(suffix)] for f in os.listdir(directory)
+               if f.endswith(suffix) and f.startswith(prefix)] if os.path.isdir(directory) else []
+    if len(matches) != 1:
+        raise ValueError("ID is missing or ambiguous; use a longer ID")
+    return matches[0]
+
+
+def handle_command(agent, ui, command, history):
+    parts = command.split()
+    name, arguments = parts[0].lower(), parts[1:]
+    if name in ("/exit", "/quit"):
+        if arguments:
+            raise ValueError("Usage: /exit")
+        return False
+    if name in ("/help", "/?"):
+        ui.help()
+    elif name == "/reset":
+        agent.reset()
+        ui.notice("Conversation cleared. Saved outputs and background jobs remain available.")
+    elif name == "/clear":
+        ui.clear()
+        show_banner(agent, ui)
+    elif name == "/status":
+        ui.config({"Model": agent.last_model or agent.model, "Server": agent.base_url,
+                   "Context": "%s tokens" % format(agent.ctx, ","), "Thinking": "on" if agent.think else "off",
+                   "Approvals": "automatic (--yes)" if agent.auto_approve else "ask before changes",
+                   "Workspace": agent.workdir, "Packages": str(agent.it.repository),
+                   "Notes": agent.notes_dir, "State": agent.state_dir,
+                   "Last request": "%.1f s" % agent.last_duration if agent.last_duration is not None else "none"})
+    elif name == "/jobs":
+        if len(arguments) > 1:
+            raise ValueError("Usage: /jobs [job ID]")
+        job_id = saved_id(agent, "jobs", arguments[0]) if arguments else None
+        data = agent.it.it_job_status(job_id)
+        agent.save_output(json.dumps(data, ensure_ascii=False))
+        ui.jobs(data)
+        if agent.last_output_id:
+            ui.notice("Full job data and log details: /output " + agent.last_output_id)
+    elif name == "/output":
+        if len(arguments) > 2:
+            raise ValueError("Usage: /output [output ID] [character offset]")
+        output_id = saved_id(agent, "outputs", arguments[0] if arguments else None)
+        offset = int(arguments[1]) if len(arguments) > 1 else 0
+        result = agent.call_tool("read_tool_output", {"output_id": output_id, "offset": offset, "limit": 2000})
+        if result.startswith("Error:"):
+            raise ValueError(result)
+        page = json.loads(result)
+        ui.output(page["content"], title="Output %s (character %d)" % (output_id, offset))
+        if page["next_offset"] is not None:
+            ui.notice("Next page: /output %s %d" % (output_id, page["next_offset"]))
+    elif name == "/history":
+        rows = ["%2d  %s" % (index, item.replace("\n", " ")[:180])
+                for index, item in list(enumerate(history, 1))[-10:]]
+        ui.output("\n".join(rows) if rows else "No requests in this session yet.", title="Recent requests")
+    else:
+        ui.error("Unknown command %s. Use /help to see the available commands." % name)
+    return True
+
+
+def paste_request(ui, input_fn=None):
+    read = input_fn or input
+    ui.notice("Paste your request. Finish with a single '.' on its own line; Ctrl+C discards the paste.")
+    lines = []
+    try:
+        while True:
+            line = read()
+            if line == ".":
+                return "\n".join(lines).strip()
+            lines.append(line)
+    except KeyboardInterrupt:
+        ui.notice("Paste discarded")
+        return ""
+
+
+def main(argv=None):
     p = argparse.ArgumentParser(description="Local agent for an OpenAI-compatible server.")
     p.add_argument("task", nargs="*", help="run one task and exit")
     p.add_argument("--url", default=os.environ.get("AGENT_URL", "http://127.0.0.1:8080/v1"),
@@ -770,42 +928,68 @@ def main():
     p.add_argument("--state-dir", help="folder for durable IT jobs, snapshots and full tool output (default: state next to agent.py)")
     p.add_argument("--max-steps", type=int, default=MAX_STEPS, help="maximum model/tool rounds per task (1-200)")
     p.add_argument("--deployment-timeout", type=int, default=3600, help="copy/installer monitoring timeout in seconds (60-86400)")
-    a = p.parse_args()
-
-    agent = Agent(a.url, a.model, a.workdir, a.yes, a.think, a.ctx, a.notes,
-                  a.package_repo, a.state_dir, a.max_steps, a.deployment_timeout)
+    p.add_argument("--plain", action="store_true", help="plain terminal output without colour or animation")
+    p.add_argument("--verbose", action="store_true", help="show complete tool results and model reasoning when --think is enabled")
+    a = p.parse_args(argv)
+    ui = TerminalUI(plain=a.plain, verbose=a.verbose)
     try:
+        agent = Agent(a.url, a.model, a.workdir, a.yes, a.think, a.ctx, a.notes,
+                      a.package_repo, a.state_dir, a.max_steps, a.deployment_timeout, ui=ui)
         if a.task:
             answer = agent.run(" ".join(a.task))
             if not agent.answer_shown:
-                print(render_bold(answer, close=True)[0])
+                ui.assistant(answer)
             if agent.speed():
-                print(dim(agent.speed()))
-            return
-        print("Local agent in %s. /reset clears history, /exit quits." % agent.workdir)
+                ui.metrics(agent.speed())
+            return 0
+        show_banner(agent, ui)
+        history = []
+        try:
+            import readline  # native editing/history on Unix; Windows uses its console editor
+        except ImportError:
+            pass
         threading.Thread(target=agent.warm_up, daemon=True).start()
         while True:
-            task = input("\n> ").strip()
-            if task in ("/exit", "/quit"):
-                break
-            if task == "/reset":
-                agent.reset()
-                continue
-            if task:
-                try:
-                    print()
-                    answer = agent.run(task)
-                    if not agent.answer_shown:
-                        print(render_bold(answer, close=True)[0])
-                    if agent.speed():
-                        print(dim(agent.speed()))
-                except RuntimeError as e:
-                    print("Error: %s" % e)
-    except RuntimeError as e:
-        sys.exit("Error: %s" % e)
-    except (KeyboardInterrupt, EOFError):
-        print()
+            task = None
+            try:
+                task = ui.prompt().strip()
+                if not task:
+                    continue
+                if task == "/paste":
+                    task = paste_request(ui)
+                elif task.startswith("/"):
+                    if not handle_command(agent, ui, task, history):
+                        break
+                    continue
+                if not task:
+                    continue
+                history.append(task)
+                if len(history) > 100:
+                    del history[0]
+                answer = agent.run(task)
+                if not agent.answer_shown:
+                    ui.assistant(answer)
+                if agent.speed():
+                    ui.metrics(agent.speed())
+            except KeyboardInterrupt:
+                if task is None:
+                    ui.notice("Input cleared. Use /exit to close the chat.")
+                else:
+                    ui.notice("Request interrupted. Accepted background jobs continue; use /jobs to check them. /exit closes the chat.", tone="warning")
+            except (RuntimeError, ValueError, OSError) as error:
+                ui.error(str(error))
+        ui.notice("Chat closed. Accepted background jobs continue.")
+        return 0
+    except (RuntimeError, ValueError, OSError) as error:
+        ui.error(str(error))
+        return 1
+    except KeyboardInterrupt:
+        ui.notice("Request interrupted. Accepted background jobs continue; inspect them before retrying a change.", tone="warning")
+        return 130
+    except EOFError:
+        ui.notice("Chat closed. Accepted background jobs continue.")
+        return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

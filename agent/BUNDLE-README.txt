@@ -3,7 +3,16 @@ Local agent for Windows
 
 Contents: the agent, a launcher, and llama.cpp builds for the processor
 (llama-cpu) and for graphics cards (llama-vulkan). Models are separate.
-Keep agent.py, it_tools.py and it_windows.ps1 together. Atlas is not needed.
+Keep agent.py, it_tools.py, it_windows.ps1 and terminal_ui.py together.
+Atlas is not needed.
+
+The terminal shows the model/workspace, readable tool activity and job tables.
+/help lists commands. /jobs checks deployments without using the model;
+/status shows settings; /output reads saved tool results; /paste enters a
+multiline request (finish with a single . line). Ctrl+C cancels the current
+request and returns to the prompt. /exit closes the chat. Accepted background
+IT jobs continue. --plain disables colour/animation; --verbose expands tools
+and shows reasoning when --think is enabled. NO_COLOR is also supported.
 
 1. Download ALL the parts of one or more models into Downloads
    (https://github.com/AOSPAndroid/tools/releases):
