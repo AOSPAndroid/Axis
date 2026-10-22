@@ -1,4 +1,4 @@
-name: Build local agent bundle
+name: Build Axis bundle
 
 on:
   push:
@@ -65,7 +65,7 @@ jobs:
           set -euo pipefail
           if ! gh release view "$TAG" > /dev/null 2>&1; then
             gh release create "$TAG" --target "$GITHUB_SHA" --latest=false \
-              --title "Local agent for Windows" --notes-file agent/BUNDLE-README.txt
+              --title "Axis for Windows" --notes-file agent/BUNDLE-README.txt
           fi
           gh release upload "$TAG" local-agent-windows.zip local-agent-windows.zip.sha256 --clobber
           gh release edit "$TAG" --notes-file agent/BUNDLE-README.txt

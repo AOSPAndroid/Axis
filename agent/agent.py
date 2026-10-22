@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal local agent for an OpenAI-compatible server (llama-server or LM Studio).
+"""Axis: a local assistant for an OpenAI-compatible server (llama-server or LM Studio).
 
 Python 3.8+ standard library only. Usage:
     python agent.py                      # interactive
@@ -24,7 +24,7 @@ import uuid
 MAX_TOOL_OUTPUT = 3000   # chars of tool output sent back to the model (start and end kept)
 MAX_STEPS = 15           # tool calls per task before giving up
 
-SYSTEM_PROMPT = """You are a helpful assistant running locally on the user's Windows computer. You chat, answer questions, explain, write and translate like any assistant. You can also use tools to work with files and run PowerShell commands on this computer and on other computers by name.
+SYSTEM_PROMPT = """You are Axis, a helpful assistant running locally on the user's Windows computer. You chat, answer questions, explain, write and translate like any assistant. You can also use tools to work with files and run PowerShell commands on this computer and on other computers by name.
 
 ## When to use tools
 - Only when the request needs them: information from a computer or file, or an action. For greetings, tests, general questions, writing or explanations, just answer without running anything.
@@ -128,6 +128,7 @@ class Agent:
         # The server is local; never route it through a system proxy.
         self.http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         self.stats = {}
+        self.stream_lead = ""
         self.facts, self.elevated = system_facts()
         self.reset()
 
@@ -235,7 +236,7 @@ class Agent:
 
     def read_stream(self, resp):
         """Collect a streamed reply, printing visible text as it arrives."""
-        live = LiveText()
+        live = LiveText(self.stream_lead)
         calls = {}
         reasoning_open = False
         for raw in resp:
@@ -293,8 +294,9 @@ class Agent:
         self.stats = {}
         self.answer_shown = False
         self.messages.append({"role": "user", "content": task})
-        for _ in range(MAX_STEPS):
+        for step in range(MAX_STEPS):
             self.trim_history()
+            self.stream_lead = "\n" if step else ""  # set the model's words apart from tool output
             msg = self.chat()
             content = strip_thinking(msg.get("content") or "")
             calls = msg.get("tool_calls") or []
@@ -566,10 +568,11 @@ class LiveText:
     """Prints streamed model text, hiding <think> blocks and tool-call markup like strip_thinking does."""
     TAGS = ("<think>", "</think>", "<tool_call>", "<function=")
 
-    def __init__(self):
+    def __init__(self, lead=""):
         self.text = ""
         self.shown = 0
         self.bold = False
+        self.lead = lead  # printed before the first visible text, e.g. a blank line after tool output
 
     def visible(self, final=False):
         t = self.text
@@ -594,6 +597,8 @@ class LiveText:
 
     def show(self, v):
         if len(v) > self.shown:
+            if not self.shown and self.lead:
+                print(self.lead, end="")
             out, self.bold = render_bold(v[self.shown:], self.bold)
             print(out, end="", flush=True)
             self.shown = len(v)
@@ -689,7 +694,7 @@ dim, cyan, yellow = _color("2"), _color("36"), _color("33")
 def main():
     if os.name == "nt":
         os.system("")  # enable ANSI colours in the Windows console
-    p = argparse.ArgumentParser(description="Local agent for an OpenAI-compatible server.")
+    p = argparse.ArgumentParser(description="Axis: a local assistant for an OpenAI-compatible server.")
     p.add_argument("task", nargs="*", help="run one task and exit")
     p.add_argument("--url", default=os.environ.get("AGENT_URL", "http://127.0.0.1:8080/v1"),
                    help="server base URL (LM Studio: http://127.0.0.1:1234/v1)")
@@ -710,7 +715,7 @@ def main():
             if agent.speed():
                 print(dim(agent.speed()))
             return
-        print("Local agent in %s. /reset clears history, /exit quits." % agent.workdir)
+        print("Axis is ready. Working folder: %s. /reset clears history, /exit quits." % agent.workdir)
         threading.Thread(target=agent.warm_up, daemon=True).start()
         while True:
             task = input("\n> ").strip()

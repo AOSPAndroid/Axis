@@ -6,10 +6,10 @@ It needs Python 3.8 or newer and nothing else.
 
 ## Offline bundle (Windows, browser downloads only)
 
-If the command line can't reach the internet, download [local-agent-windows.zip](https://github.com/AOSPAndroid/tools/releases/download/local-agent-windows/local-agent-windows.zip) and the parts of one model in your browser:
+If the command line can't reach the internet, download [local-agent-windows.zip](https://github.com/AOSPAndroid/Axis/releases/download/local-agent-windows/local-agent-windows.zip) and the parts of one model in your browser:
 
-- [Qwen3.6-35B-A3B](https://github.com/AOSPAndroid/tools/releases/tag/qwen3.6-35b-a3b-q4-k-m): 22 GB, needs 32 GB of RAM or more. This is the recommended model. It's a mixture-of-experts model with about 3B parameters active per token, so it runs well on a processor.
-- [Qwen3.8-9B distill](https://github.com/AOSPAndroid/tools/releases/tag/qwen3.8-9b-q4-k-m): 5.8 GB, needs 16 GB of RAM.
+- [Qwen3.6-35B-A3B](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m): 22 GB, needs 32 GB of RAM or more. This is the recommended model. It's a mixture-of-experts model with about 3B parameters active per token, so it runs well on a processor.
+- [Qwen3.8-9B distill](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-9b-q4-k-m): 5.8 GB, needs 16 GB of RAM.
 
 Then double-click `Start Agent.bat`. `start.py` checks and joins the parts, using about 2 GB of spare disk and resuming if interrupted. It then starts llama-server and opens the agent. If both models are present it uses the 35B. Add `--model 9b` to choose the smaller one.
 
@@ -18,7 +18,7 @@ Then double-click `Start Agent.bat`. `start.py` checks and joins the parts, usin
 `setup_local.py` downloads and verifies the model, installs the right llama.cpp build for your GPU, fetches the agent, and writes `start-server.bat` and `agent.bat` into `%USERPROFILE%\local-ai`:
 
 ```
-curl.exe -LO https://raw.githubusercontent.com/AOSPAndroid/tools/claude/local-agent/agent/setup_local.py
+curl.exe -LO https://raw.githubusercontent.com/AOSPAndroid/Axis/claude/local-agent/agent/setup_local.py
 python setup_local.py
 ```
 

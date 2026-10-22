@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start the local agent: prepare the model, start llama-server, then open the agent.
+"""Start Axis: prepare the model, start llama-server, then open the assistant.
 
 Double-click "Start Agent.bat", or run:  python start.py [--workdir DIR] [--model KEY] [--cpu]
 Needs no internet access. The model parts are picked up from Downloads (or
@@ -18,7 +18,7 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PART_SIZE = 1900000000
-RELEASES = "https://github.com/AOSPAndroid/tools/releases/tag/"
+RELEASES = "https://github.com/AOSPAndroid/Axis/releases/tag/"
 # Menu order. "parts" are the SHA-256 of each 1.9 GB release part.
 with open(os.path.join(HERE, "models.json")) as _f:
     MODELS = {m["key"]: dict(m, release=RELEASES + m["tag"]) for m in json.load(_f)}
@@ -284,7 +284,7 @@ def start_server(exe, model, ctx, gpu, think=False):
 
 
 def main():
-    p = argparse.ArgumentParser(description="Start llama-server and the local agent.")
+    p = argparse.ArgumentParser(description="Start llama-server and Axis.")
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
                    help="folder the agent works in (default: the workspace folder here)")
     p.add_argument("--ctx", type=int, default=8192, help="context size in tokens")
@@ -322,7 +322,7 @@ def main():
             sys.exit("Could not start llama-server. Details are in %s" % os.path.join(HERE, "server.log"))
 
     try:
-        log("\nAgent working folder: %s" % os.path.abspath(a.workdir))
+        log()
         subprocess.call([sys.executable, os.path.join(HERE, "agent.py"),
                          "--workdir", a.workdir, "--ctx", str(a.ctx)] + agent_args)
     except KeyboardInterrupt:

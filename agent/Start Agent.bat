@@ -1,5 +1,6 @@
 @echo off
-rem Double-click to start the local agent.
+rem Double-click to start Axis.
+title Axis
 cd /d "%~dp0"
 set "PY="
 where py >/dev/null 2>/dev/null && set "PY=py -3"

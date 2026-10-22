@@ -1,11 +1,14 @@
-Local agent for Windows
-=======================
+Axis for Windows
+================
+
+Full guide with screenshots:
+https://github.com/AOSPAndroid/Axis/blob/claude/local-agent/docs/GUIDE.md
 
 Contents: the agent, a launcher, and llama.cpp builds for the processor
 (llama-cpu) and for graphics cards (llama-vulkan). Models are separate.
 
 1. Download ALL the parts of one or more models into Downloads
-   (https://github.com/AOSPAndroid/tools/releases):
+   (https://github.com/AOSPAndroid/Axis/releases):
 
    Qwen3.6-35B-A3B              22.1 GB, 12 parts  fast; good at terminal tasks
    Qwen3.8-27B                  16.5 GB,  9 parts  newest; best at terminal tasks, slow
