@@ -1,7 +1,0 @@
-bin/
-obj/
-interop/
-artifacts/
-.vs/
-*.user
-*.suo

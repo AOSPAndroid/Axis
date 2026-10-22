@@ -1,60 +1,22 @@
-# tools
+# Qwen3.8-9B Distill — Q4_K_M
 
-Windows support utilities.
+Model download and instructions for an 8 GB VRAM setup.
 
-## RDP-BottomHalf.ps1
+**[Download the model](https://github.com/AOSPAndroid/tools/releases/tag/qwen3.8-9b-q4-k-m)**
 
-[RDP-BottomHalf.ps1](RDP-BottomHalf.ps1) opens a Remote Desktop Connection (`mstsc`) in the usable lower half of a portrait monitor. It is designed for a layout where **screen 3 is the far-left monitor at 1440 × 2560**.
+- Model: Empero's community Qwen3.8-9B distillation, using the Qwen3.5-9B architecture. This is not an official Alibaba 9B Qwen3.8 release.
+- Format: GGUF, Q4_K_M quantization; 5,780,090,176 bytes (5.78 GB).
+- Download all four `.part001` through `.part004` assets and follow the release's `README.txt` to reassemble them.
+- Verify the resulting model against `MODEL-SHA256SUM.txt` before loading.
+- Use a recent LM Studio or llama.cpp with Qwen3.5 / Gated DeltaNet support. Start with 4,096 context tokens and one simultaneous request; fit and speed depend on your GPU and runtime.
+- License, upstream model card and checksums are included in the release.
 
-The launcher reads the monitor coordinates, excludes the taskbar, accounts for the window frame and title bar, and requests a matching remote desktop resolution. It then positions the new connection and checks its client dimensions.
+## Source
 
-### Requirements
+[empero-ai/Qwen3.8-9B-Distill-GGUF](https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF), revision `760121cd70bb4c36b2b5ec58eb765e0df5987efe`.
 
-- Windows 10 or Windows 11 with Windows PowerShell 5.1 or later and Remote Desktop Connection.
-- A remote PC you can already reach through a direct RDP connection.
-- A writable folder containing the script, where it can save a new `.rdp` file.
+SHA-256 of the reassembled GGUF:
 
-Run the script on the **Windows desktop where you normally launch Remote Desktop**. If you launch RDP inside a Citrix desktop, run the script inside that Citrix desktop.
-
-### Run
-
-Open PowerShell in the folder containing the script and run:
-
-```powershell
-powershell.exe -NoProfile -File .\RDP-BottomHalf.ps1
+```text
+df13d66021cef676f82be74053220fd75af6bf2a6a7fb77f5222ab9e50744a7a
 ```
-
-1. Enter the remote computer name or IP address; an optional `:port` is accepted.
-2. Finish signing in through the normal Windows Remote Desktop interface.
-3. Once the remote desktop is fully visible, return to the PowerShell window and press **Enter** to position it.
-
-By default, the launcher uses the far-left monitor if its resolution is 1440 × 2560. If the layout differs, it asks you to place the mouse pointer on the intended monitor and press Enter in the console.
-
-### Options
-
-Provide the computer name directly:
-
-```powershell
-.\RDP-BottomHalf.ps1 -ComputerName DESKTOP123
-```
-
-Choose a monitor using the mouse pointer, regardless of the default layout:
-
-```powershell
-.\RDP-BottomHalf.ps1 -ComputerName DESKTOP123 -PickMonitor
-```
-
-### Reuse
-
-The launcher prints the path of a new `.rdp` file saved beside the script. Open that file for subsequent connections using the same monitor layout. **Keep the window at the generated dimensions**; this launcher sets a fixed desktop resolution. Run it again if the monitor layout or scaling changes.
-
-This is a **direct-PC launcher**. It does not import RD Gateway settings from another connection file. Credentials are entered in the Windows RDP interface.
-
-### Validation
-
-The script has been **statically reviewed and has not been tested on the user's Windows machine**. It reports when exact sizing cannot be verified on the installed `mstsc` build.
-
-### References
-
-- [Microsoft: mstsc command reference](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/mstsc)
-- [Microsoft: RDP window placement with winposstr](https://techcommunity.microsoft.com/blog/microsoft-security-blog/specifying-the-ts-client-start-location-on-the-virtual-desktop/246610)
