@@ -69,14 +69,14 @@ class TerminalUITests(unittest.TestCase):
         self.assertEqual(stream.getvalue().count("[AXIS]"), 1)
         self.assertNotIn("**", stream.getvalue())
 
-    def test_reasoning_is_compact_unless_verbose(self):
+    def test_reasoning_is_visible_without_expanding_tool_output(self):
         for verbose in (False, True):
             stream = io.StringIO()
             ui = TerminalUI(stream=stream, plain=True, verbose=verbose)
             ui.write_thinking("Detailed external model reasoning")
             ui.end_thinking()
             self.assertIn("Thinking", stream.getvalue())
-            self.assertEqual("Detailed external model reasoning" in stream.getvalue(), verbose)
+            self.assertIn("Detailed external model reasoning", stream.getvalue())
 
     def test_job_state_never_implies_verified_installation(self):
         stream = io.StringIO()

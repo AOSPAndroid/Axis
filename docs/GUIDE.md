@@ -159,15 +159,17 @@ Keep notes to procedures and environment facts, not staff or directory data.
 
 ## Thinking mode
 
-For tricky problems, start Axis with thinking on. The model then reasons before it answers. The console shows a compact thinking indicator; add `--verbose` to display the reasoning text:
+Thinking is enabled and visible by default. Double-click `Start Agent.bat` normally: the model's reasoning streams in grey before its answer. Tool results stay compact, and `--verbose` expands them separately.
+
+For faster answers without thinking, run:
 
 ```
-"Start Agent.bat" --think --verbose
+"Start Agent.bat" --no-think
 ```
 
 ![Thinking mode: the model's reasoning in grey, then the answer](images/05-think.png)
 
-It's slower, so it's off by default. If you are reusing a server started with thinking disabled, restart it with the new settings.
+Thinking can delay the final answer. If you are reusing a server started with thinking disabled, restart it with the new settings.
 
 ## Options
 
@@ -176,8 +178,9 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | Option | What it does |
 | --- | --- |
 | `--model KEY` | Use this model without asking (see [model keys](#choosing-a-model)). |
-| `--think` | Turn on reasoning. Slower; use `--verbose` to display it. |
-| `--verbose` | Show reasoning and full tool results. |
+| `--think` | Enable and show model reasoning. This is the default. |
+| `--no-think` | Disable thinking for faster answers. |
+| `--verbose` | Expand tool results; thinking is already shown by default. |
 | `--plain` | Use compact headings without the logo, colour or animation. `NO_COLOR` also disables colour. |
 | `--no-web` | Disable public web search and page reads. |
 | `--cpu` | Use only the processor, even if a graphics card is found. |
@@ -198,7 +201,7 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | "The model is not ready yet" | One or more parts are missing or still downloading. Axis lists them. Download them and start again. |
 | It stops while loading the model | Look at `server.log` in the `local-agent` folder. For memory errors, try `--ctx 8192`, or a smaller model. |
 | Answers are slow | Check the speed line. If "wrote" is under about 8 per second, use Qwen3.6-35B-A3B. On a PC with a weak graphics card, compare with `--cpu`. |
-| The answer is wrong or made up | Ask it to check with a command, add the facts to your notes, or use Qwen3.8-27B or `--think` for hard questions. |
+| The answer is wrong or made up | Ask it to verify with tools, add the facts to your notes, or compare another model on the task. Thinking is already enabled by default. |
 
 ## Updating
 

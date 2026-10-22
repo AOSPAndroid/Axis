@@ -17,8 +17,8 @@ Narrow terminals and --plain use a compact AXIS heading.
 /status shows settings; /output reads saved tool results; /paste enters a
 multiline request (finish with a single . line). Ctrl+C cancels the current
 request and returns to the prompt. /exit closes the chat. Accepted background
-IT jobs continue. --plain disables colour/animation; --verbose expands tools
-and shows reasoning when --think is enabled. NO_COLOR is also supported.
+IT jobs continue. Thinking is enabled and shown by default. --plain disables
+colour/animation; --verbose expands tool output. NO_COLOR is also supported.
 
 Public web search and page reading are available by default. For example:
   Search Microsoft's documentation for installer exit code 3010 and cite it.
@@ -79,8 +79,10 @@ files in the "notes" folder. The agent searches them before guessing, and
 always reads notes\ALWAYS.md (keep it short). notes\EXAMPLE.md shows the
 format. Re-extracting the zip only replaces EXAMPLE.md.
 
-To see the model's reasoning, start with: "Start Agent.bat" --think
-(slower: it thinks before every answer).
+The model's thinking appears in grey before its answer automatically.
+Just double-click "Start Agent.bat". For faster answers without thinking,
+start with: "Start Agent.bat" --no-think
+Restart an existing model server if it was started with thinking disabled.
 
 The agent works in the "workspace" folder next to start.py. To use another
 folder: python start.py --workdir C:\path\to\folder

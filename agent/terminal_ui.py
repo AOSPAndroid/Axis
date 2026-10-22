@@ -321,15 +321,14 @@ class TerminalUI:
         self.end_response()
         with self._lock:
             if not self._thinking_open:
-                self._raw(self._style("  Thinking" + ("\n" if self.verbose else "..."), "dim"))
+                self._raw(self._style("  Thinking\n", "dim"))
                 self._thinking_open = True
 
     def write_thinking(self, text):
         if not self._thinking_open:
             self.begin_thinking()
-        if self.verbose:
-            with self._lock:
-                self._raw(self._style(clean_text(text), "dim"))
+        with self._lock:
+            self._raw(self._style(clean_text(text), "dim"))
 
     def end_thinking(self):
         self._stop_activity()

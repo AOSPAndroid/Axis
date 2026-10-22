@@ -244,8 +244,7 @@ class Agent:
         """Have the server process the system prompt now, so the first answer starts sooner."""
         body = {"model": self.model, "messages": self.messages + [{"role": "user", "content": "hi"}],
                 "tools": self.tools, "max_tokens": 1}
-        if not self.think:
-            body["chat_template_kwargs"] = {"enable_thinking": False}
+        body["chat_template_kwargs"] = {"enable_thinking": self.think}
         req = urllib.request.Request(self.base_url + "/chat/completions", data=json.dumps(body).encode("utf-8"),
                                      headers={"Content-Type": "application/json"})
         try:
@@ -260,8 +259,7 @@ class Agent:
         sampling = {"temperature": 0.6, "top_p": 0.95} if self.think else {"temperature": 0.3, "top_p": 0.9}
         body = dict({"model": self.model, "messages": self.messages, "tools": self.tools, "top_k": 20}, **sampling)
         body["max_tokens"] = self.max_reply
-        if not self.think:
-            body["chat_template_kwargs"] = {"enable_thinking": False}
+        body["chat_template_kwargs"] = {"enable_thinking": self.think}
         body["stream"] = True
         req = urllib.request.Request(
             self.base_url + "/chat/completions",
@@ -943,7 +941,11 @@ def main(argv=None):
     p.add_argument("--workdir", default=".", help="folder the agent may work in")
     p.add_argument("--yes", action="store_true", help="approve writes and commands without asking")
     p.add_argument("--ctx", type=int, default=16384, help="context size the server was started with (-c)")
-    p.add_argument("--think", action="store_true", help="enable the model's thinking mode (slower; shows its reasoning)")
+    thinking = p.add_mutually_exclusive_group()
+    thinking.add_argument("--think", dest="think", action="store_true", default=True,
+                          help="enable and show model thinking (default; slower)")
+    thinking.add_argument("--no-think", dest="think", action="store_false",
+                          help="disable model thinking for faster answers")
     p.add_argument("--notes", help="notes folder (default: the notes folder next to agent.py)")
     p.add_argument("--package-repo", default=os.environ.get("AGENT_PACKAGE_REPO") or os.environ.get("WMI_PACKAGE_REPO") or DEFAULT_PACKAGE_REPO,
                    help="package root (default: the configured OneDrive BetaPackages folder)")
@@ -951,7 +953,7 @@ def main(argv=None):
     p.add_argument("--max-steps", type=int, default=MAX_STEPS, help="maximum model/tool rounds per task (1-200)")
     p.add_argument("--deployment-timeout", type=int, default=3600, help="copy/installer monitoring timeout in seconds (60-86400)")
     p.add_argument("--plain", action="store_true", help="plain terminal output without colour or animation")
-    p.add_argument("--verbose", action="store_true", help="show complete tool results and model reasoning when --think is enabled")
+    p.add_argument("--verbose", action="store_true", help="show complete tool results")
     p.add_argument("--no-web", action="store_true", help="disable public web search and page reading")
     a = p.parse_args(argv)
     ui = TerminalUI(plain=a.plain, verbose=a.verbose)

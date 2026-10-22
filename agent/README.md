@@ -8,7 +8,7 @@ It needs Python 3.8 or newer and nothing else.
 
 ## Terminal interface
 
-The console opens with an AXIS ASCII logo, the active model, context, thinking/approval mode, workspace and package repository. Narrow terminals and `--plain` use a compact AXIS heading. Responses appear under AXIS with clearly labelled tool activity; inspections and deployment results use compact tables. Web searches show titles, snippets and source URLs; page reads show an excerpt, links and the next text offset when more is available. During model/tool work an elapsed-time indicator runs in interactive terminals. Reasoning stays compact by default; add `--verbose` to show reasoning (with `--think`) and complete tool results.
+The console opens with an AXIS ASCII logo, the active model, context, thinking/approval mode, workspace and package repository. Narrow terminals and `--plain` use a compact AXIS heading. Responses appear under AXIS with clearly labelled tool activity; inspections and deployment results use compact tables. Web searches show titles, snippets and source URLs; page reads show an excerpt, links and the next text offset when more is available. During model/tool work an elapsed-time indicator runs in interactive terminals. Thinking is enabled by default and the model's reasoning streams in grey before its answer. Tool output stays compact; add `--verbose` to expand it, or `--no-think` to disable thinking for faster answers.
 
 The interface uses the standard library and keeps normal terminal scrollback. It adapts to narrow windows, falls back to ASCII when needed, honours `NO_COLOR`, and supports `--plain` for output without colour or animation. Model/file/command text cannot inject terminal control sequences. Approval panels show the complete wrapped action, with control characters made visible.
 
@@ -147,20 +147,21 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--workdir` | current folder | The only folder the file tools may use |
 | `--ctx` | `16384` | Must match the server's `-c`; older history is compacted to fit |
 | `--yes` | off | Approve writes and commands without asking |
-| `--think` | off | Turn on Qwen's thinking mode: better on hard tasks, slower, uses more context |
+| `--think` | on | Enable model thinking and show its reasoning; slower and uses more context |
+| `--no-think` | off | Disable thinking for faster answers |
 | `--no-web` | off | Disable public web search and page reading |
 | `--package-repo` | OneDrive BetaPackages folder above; environment variables override | Root containing deployable package folders |
 | `--state-dir` | `state` next to agent.py | Durable jobs, snapshots and full tool results |
 | `--max-steps` | `30` | Maximum model/tool rounds per request (1–200) |
 | `--deployment-timeout` | `3600` | Copy/installer monitoring timeout in seconds (60–86400) |
 | `--plain` | off | Disable colours and animation |
-| `--verbose` | off | Show full tool output and reasoning when thinking is enabled |
+| `--verbose` | off | Show full tool output; reasoning is already visible by default |
 
 ## Your notes
 
 Put runbooks, procedures, known fixes and names as `.md` or `.txt` files in the `notes` folder next to `agent.py` (or pass `--notes DIR`). The agent sees the list of files, searches them with `search_notes` before guessing, and opens one with `read_note`. `notes/ALWAYS.md` is loaded into every conversation, so keep it short. `notes/EXAMPLE.md` shows the format.
 
-`--think` turns on the model's reasoning and shows it, dimmed, before the answer. It's slower.
+The model's reasoning is enabled and shown, dimmed, before the answer by default. `--no-think` disables thinking. If a reused model server was started with thinking disabled, restart it to apply the new default.
 
 ## Notes
 

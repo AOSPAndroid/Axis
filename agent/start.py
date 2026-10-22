@@ -249,7 +249,7 @@ def server_ready():
         return False
 
 
-def start_server(exe, model, ctx, gpu, think=False, alias=None):
+def start_server(exe, model, ctx, gpu, think=True, alias=None):
     log_path = os.path.join(HERE, "server.log")
     cmd = [exe, "-m", model, "-c", str(ctx), "--jinja", "--host", "127.0.0.1", "--port", str(PORT),
            # On a graphics card llama.cpp fits as many layers (or, for mixture-of-experts
@@ -307,16 +307,21 @@ def server_model():
         return None
 
 
-def main():
+def main(argv=None):
     p = argparse.ArgumentParser(description="Start llama-server and Axis.")
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
                    help="folder the agent works in (default: the workspace folder here)")
     p.add_argument("--ctx", type=int, default=16384, help="context size in tokens")
     p.add_argument("--model", choices=list(MODELS), help="which model to use (default: ask when several are present)")
+    thinking = p.add_mutually_exclusive_group()
+    thinking.add_argument("--think", dest="think", action="store_true", default=True,
+                          help="enable and show model thinking (default)")
+    thinking.add_argument("--no-think", dest="think", action="store_false",
+                          help="disable model thinking for faster answers")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--cpu", action="store_true", help="always run on the processor")
     g.add_argument("--gpu", action="store_true", help="try the graphics card even if none was detected")
-    a, agent_args = p.parse_known_args()
+    a, agent_args = p.parse_known_args(argv)
 
     key, model = prepare_model(a.model)
     alias = MODELS[key]["name"]
@@ -341,7 +346,7 @@ def main():
                 continue
             where = "graphics card + processor" if build == "vulkan" else "processor"
             log("Starting llama-server (%s), loading the model" % where)
-            proc = start_server(exe, model, a.ctx, build == "vulkan", think="--think" in agent_args, alias=alias)
+            proc = start_server(exe, model, a.ctx, build == "vulkan", think=a.think, alias=alias)
             if proc:
                 break
             if build == "vulkan":
@@ -352,7 +357,8 @@ def main():
     try:
         log()
         return wait_for_agent([sys.executable, os.path.join(HERE, "agent.py"), "--model", alias,
-                               "--workdir", a.workdir, "--ctx", str(a.ctx)] + agent_args)
+                               "--workdir", a.workdir, "--ctx", str(a.ctx),
+                               "--think" if a.think else "--no-think"] + agent_args)
     finally:
         if proc:
             proc.terminate()

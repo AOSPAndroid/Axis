@@ -160,6 +160,7 @@ class LauncherIntegrationTests(unittest.TestCase):
             self.assertIs(result, process)
             command = popen.call_args.args[0]
             self.assertEqual(command[command.index("--alias") + 1], "selected-model")
+            self.assertNotIn("--reasoning-budget", command)
             options = popen.call_args.kwargs
             if os.name == "nt":
                 flags = options.get("creationflags", 0)
@@ -167,6 +168,35 @@ class LauncherIntegrationTests(unittest.TestCase):
                 self.assertTrue(flags & start.subprocess.CREATE_NO_WINDOW)
             else:
                 self.assertTrue(options.get("start_new_session"))
+
+    def test_launcher_keeps_server_and_agent_thinking_settings_in_sync(self):
+        for options, expected in (([], True), (["--think"], True), (["--no-think"], False)):
+            with self.subTest(options=options), tempfile.TemporaryDirectory() as folder:
+                process = MagicMock()
+                with patch.object(start, "prepare_model", return_value=("35b", "model.gguf")), \
+                     patch.object(start, "server_ready", return_value=False), \
+                     patch.object(start, "gpus", return_value=[]), \
+                     patch.object(start, "find_server", return_value="llama-server.exe"), \
+                     patch.object(start, "start_server", return_value=process) as server, \
+                     patch.object(start, "wait_for_agent", return_value=0) as launch, \
+                     patch.object(start, "log"):
+                    self.assertEqual(start.main(["--workdir", folder] + options), 0)
+                self.assertEqual(server.call_args.kwargs["think"], expected)
+                command = launch.call_args.args[0]
+                self.assertIn("--think" if expected else "--no-think", command)
+                self.assertNotIn("--no-think" if expected else "--think", command)
+                self.assertNotIn("--verbose", command)
+
+    def test_direct_chat_defaults_to_thinking_and_allows_opt_out(self):
+        for options, expected in (([], True), (["--no-think"], False)):
+            with self.subTest(options=options):
+                ui = MagicMock()
+                ui.prompt.return_value = "/exit"
+                with patch.object(agent, "Agent") as factory, \
+                     patch.object(agent, "TerminalUI", return_value=ui), \
+                     patch.object(agent.threading, "Thread"):
+                    self.assertEqual(agent.main(options), 0)
+                self.assertEqual(factory.call_args.args[4], expected)
 
 
 if __name__ == "__main__":
