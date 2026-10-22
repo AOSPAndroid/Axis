@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Start the local agent: prepare the model, start llama-server, then open the agent.
 
-Double-click "Start Agent.bat", or run:  python start.py [--workdir DIR] [--cpu]
+Double-click "Start Agent.bat", or run:  python start.py [--workdir DIR] [--model 35b|9b] [--cpu]
 Needs no internet access. The model parts are picked up from Downloads (or
 this folder, or %USERPROFILE%\\local-ai) and joined on first run.
 """
 import argparse
 import hashlib
+import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -15,11 +17,33 @@ import urllib.error
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MODEL = "Qwen3.8-9B-Q4_K_M.gguf"
-MODEL_SIZE = 5780090176
-MODEL_SHA256 = "df13d66021cef676f82be74053220fd75af6bf2a6a7fb77f5222ab9e50744a7a"
-PARTS = [(MODEL + ".part001", 1900000000), (MODEL + ".part002", 1900000000),
-         (MODEL + ".part003", 1900000000), (MODEL + ".part004", 80090176)]
+PART_SIZE = 1900000000
+PARTS_35B = []  # filled in from the release PARTS-SHA256SUMS.txt
+RELEASES = "https://github.com/AOSPAndroid/tools/releases/tag/"
+# Preferred first. "parts" are the SHA-256 of each 1.9 GB release part, in order.
+MODELS = {
+    "35b": {
+        "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+        "size": 22134528992,
+        "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
+        "release": RELEASES + "qwen3.6-35b-a3b-q4-k-m",
+        "parts": PARTS_35B,
+        "gpu": False,  # 22 GB will not fit on an office graphics card
+    },
+    "9b": {
+        "file": "Qwen3.8-9B-Q4_K_M.gguf",
+        "size": 5780090176,
+        "sha256": "df13d66021cef676f82be74053220fd75af6bf2a6a7fb77f5222ab9e50744a7a",
+        "release": RELEASES + "qwen3.8-9b-q4-k-m",
+        "parts": [
+            "15ea33a95bd2113a1216981ab1674aa56959e16e006fdf4f4b320b139d315f35",
+            "51b933b61b4192ad2a71401ab8f47843ee43bc317d0ef292dd16a8c992ec8f0c",
+            "94b5be0fea2b7f36ff152adb4c36714d9cebb52a0e56363a546743e942c22978",
+            "c319a4ee35a766cfa4f841c262a838424a60d908ebdebf2256a5adf8a7ae8bd9",
+        ],
+        "gpu": True,
+    },
+}
 PORT = 8080
 HOME = os.path.expanduser("~")
 SEARCH_DIRS = [HERE, os.path.dirname(HERE), os.path.join(HOME, "Downloads"), os.path.join(HOME, "local-ai")]
@@ -41,47 +65,126 @@ def find_file(name, size):
     return None
 
 
-def prepare_model():
-    model = find_file(MODEL, MODEL_SIZE)
-    if model:
-        return model
+def part_list(m):
+    """[(file name, size, sha256)] for each release part of model m."""
+    count = len(m["parts"])
+    return [("%s.part%03d" % (m["file"], i + 1),
+             PART_SIZE if i < count - 1 else m["size"] - PART_SIZE * (count - 1),
+             digest) for i, digest in enumerate(m["parts"])]
 
-    found, missing = [], []
-    for name, size in PARTS:
-        path = find_file(name, size)
-        (found if path else missing).append(path or name)
-    if missing:
-        log("The model is not ready yet. Missing or incomplete:")
-        for name in missing:
-            log("  " + name)
-        log("\nDownload them from https://github.com/AOSPAndroid/tools/releases/tag/qwen3.8-9b-q4-k-m")
-        log("and wait until none of them ends in .crdownload. Looked in:")
-        for d in SEARCH_DIRS:
-            log("  " + d)
-        sys.exit(1)
 
-    model = os.path.join(HERE, MODEL)
-    tmp = model + ".joining"
-    log("Joining the model parts (one time only)...")
+def sha256(path, label):
     h = hashlib.sha256()
-    done = 0
-    with open(tmp, "wb") as out:
-        for path in found:
-            with open(path, "rb") as f:
-                for block in iter(lambda: f.read(CHUNK), b""):
-                    h.update(block)
-                    out.write(block)
-                    done += len(block)
-                    print("\r  %3d%%" % (100 * done // MODEL_SIZE), end="", flush=True)
+    size, done = os.path.getsize(path), 0
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(CHUNK), b""):
+            h.update(block)
+            done += len(block)
+            print("\r  %s %3d%%" % (label, 100 * done // max(size, 1)), end="", flush=True)
     log()
-    if h.hexdigest() != MODEL_SHA256:
-        os.remove(tmp)
-        sys.exit("Error: the joined model failed its checksum. Delete the .part files, download them again and retry.")
-    os.replace(tmp, model)
-    for path in found:
-        os.remove(path)
-    log("Model verified. Removed the .part files.")
-    return model
+    return h.hexdigest()
+
+
+def join_parts(m):
+    """Join verified parts in place (needs only one part of spare disk) and resume if interrupted."""
+    parts = part_list(m)
+    first_dir = None
+    for d in SEARCH_DIRS:
+        if os.path.exists(os.path.join(d, m["file"] + ".joining")):
+            first_dir = d
+    if first_dir is None:
+        first = find_file(*parts[0][:2])
+        first_dir = os.path.dirname(first)
+    target = os.path.join(first_dir, m["file"] + ".joining")
+    state_path = target + ".json"
+    state = {"appended": 0, "size": 0}
+    if os.path.exists(state_path):
+        with open(state_path) as f:
+            state = json.load(f)
+        log("Resuming the join after part %d." % state["appended"])
+
+    todo = parts[state["appended"]:]
+    log("Checking %d model parts (one time only)..." % len(todo))
+    paths = []
+    for i, (name, size, digest) in enumerate(todo, state["appended"] + 1):
+        path = os.path.join(first_dir, name) if i == 1 else find_file(name, size)
+        if i == 1 and not os.path.exists(path):
+            path = target  # part 1 was already renamed to the join target
+        if path is None:
+            sys.exit("Error: %s is missing. Download it from %s and rerun." % (name, m["release"]))
+        if path != target and sha256(path, "part %d/%d" % (i, len(parts))) != digest:
+            sys.exit("Error: %s is damaged. Delete it, download it again and rerun." % path)
+        paths.append(path)
+
+    log("Joining...")
+    for i, path in enumerate(paths, state["appended"] + 1):
+        if i == 1:
+            os.replace(path, target)
+            path = target
+        else:
+            with open(target, "r+b") as out:
+                out.truncate(state["size"])  # drop a half-written append from an interruption
+                out.seek(state["size"])
+                with open(path, "rb") as f:
+                    shutil.copyfileobj(f, out, CHUNK)
+                out.flush()
+                os.fsync(out.fileno())
+        state = {"appended": i, "size": os.path.getsize(target)}
+        with open(state_path, "w") as f:
+            json.dump(state, f)
+        if path != target:
+            os.remove(path)
+        print("\r  %3d%%" % (100 * state["size"] // m["size"]), end="", flush=True)
+    log()
+    if os.path.getsize(target) != m["size"]:
+        sys.exit("Error: the joined model has the wrong size. Delete %s and download the parts again." % target)
+    final = os.path.join(HERE, m["file"])
+    try:
+        os.replace(target, final)
+    except OSError:  # different drive: leave it where it is
+        final = os.path.join(first_dir, m["file"])
+        os.replace(target, final)
+    os.remove(state_path)
+    log("Model ready: %s" % final)
+    return final
+
+
+def parts_status(m):
+    found = [find_file(name, size) for name, size, _ in part_list(m)]
+    joining = any(os.path.exists(os.path.join(d, m["file"] + ".joining")) for d in SEARCH_DIRS)
+    return found, joining
+
+
+def prepare_model(choice=None):
+    """Return (model key, path). Uses the preferred model whose files are present."""
+    keys = [choice] if choice else list(MODELS)
+    for key in keys:
+        m = MODELS[key]
+        path = find_file(m["file"], m["size"])
+        if path:
+            return key, path
+        if not m["parts"]:
+            continue  # parts not published yet
+        found, joining = parts_status(m)
+        if joining or all(found):
+            return key, join_parts(m)
+        if any(found) or choice:
+            missing = [name for (name, _, _), p in zip(part_list(m), found) if not p]
+            log("The %s model is not ready yet. Missing or still downloading:" % m["file"])
+            for name in missing:
+                log("  " + name)
+            log("\nDownload them from %s" % m["release"])
+            log("(wait until none ends in .crdownload). Looked in:")
+            for d in SEARCH_DIRS:
+                log("  " + d)
+            others = [k for k in MODELS if k != key]
+            if others and not choice:
+                log("\nTo use the other model meanwhile, run: start.py --model %s" % others[0])
+            sys.exit(1)
+    log("No model found. Download the parts of one of these into Downloads:")
+    for m in MODELS.values():
+        log("  %s  %s" % (m["file"], m["release"]))
+    sys.exit(1)
 
 
 # ---- llama-server ----------------------------------------------------------
@@ -149,12 +252,14 @@ def main():
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
                    help="folder the agent works in (default: the workspace folder here)")
     p.add_argument("--ctx", type=int, default=8192, help="context size in tokens")
+    p.add_argument("--model", choices=list(MODELS), help="which model to use (default: the best one present)")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--cpu", action="store_true", help="always run on the processor")
     g.add_argument("--gpu", action="store_true", help="try the graphics card even if none was detected")
     a, agent_args = p.parse_known_args()
 
-    model = prepare_model()
+    key, model = prepare_model(a.model)
+    log("Model: %s" % os.path.basename(model))
     os.makedirs(a.workdir, exist_ok=True)
 
     proc = None
@@ -164,7 +269,8 @@ def main():
         gpus = gpu_names()
         has_gpu = any(w in n.lower() for n in gpus for w in GPU_WORDS)
         log("Graphics: %s" % (", ".join(gpus) or "unknown"))
-        builds = ["cpu"] if a.cpu else ["vulkan", "cpu"] if (a.gpu or has_gpu) else ["cpu"]
+        try_gpu = a.gpu or (has_gpu and MODELS[key]["gpu"] and not a.cpu)
+        builds = ["vulkan", "cpu"] if try_gpu else ["cpu"]
         for build in builds:
             exe = find_server(os.path.join(HERE, "llama-" + build))
             if not exe:

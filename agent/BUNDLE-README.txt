@@ -4,16 +4,25 @@ Local agent for Windows
 Contents: the agent, a launcher, and llama.cpp builds for the processor
 (llama-cpu) and for graphics cards (llama-vulkan). The model is separate.
 
-1. Download the four model parts from
+1. Download the parts of one model into Downloads:
+
+   Qwen3.6-35B-A3B (recommended, needs 32 GB+ RAM), 12 parts, 22 GB:
+   https://github.com/AOSPAndroid/tools/releases/tag/qwen3.6-35b-a3b-q4-k-m
+
+   Qwen3.8-9B distill (smaller, 16 GB RAM), 4 parts, 5.8 GB:
    https://github.com/AOSPAndroid/tools/releases/tag/qwen3.8-9b-q4-k-m
-   (Qwen3.8-9B-Q4_K_M.gguf.part001 to .part004). Leave them in Downloads.
+
+   Wait until none of them ends in .crdownload.
 
 2. Extract local-agent-windows.zip anywhere, for example Documents.
 
 3. Double-click "Start Agent.bat".
-   The first run joins and verifies the model (about 12 GB free disk
-   needed, a minute or two) and removes the .part files. It then starts
-   llama-server and opens the agent. Close the window to stop both.
+   The first run checks and joins the parts (needs about 2 GB of spare disk;
+   if interrupted it resumes) and removes them. It then starts llama-server
+   and opens the agent. Close the window to stop both.
+
+If both models are present it uses Qwen3.6-35B-A3B. To pick one:
+    python start.py --model 9b
 
 The agent works in the "workspace" folder next to start.py. To use another
 folder, run from a terminal:
