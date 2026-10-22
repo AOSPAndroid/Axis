@@ -41,11 +41,6 @@ To see the model's reasoning, start with: "Start Agent.bat" --think
 (slower: it thinks before every answer). K2-Horizon-MoVA always thinks,
 and its reasoning is always shown in grey.
 
-Axis Cloud: "Copilot Chat.bat" chats with the models in your GitHub Copilot
-license (for example GPT-6.1 Sol) through GitHub's official Copilot SDK.
-Needs Python 3.11+ and internet access to GitHub. Unlike Axis, those
-messages go to GitHub Copilot in the cloud.
-
 The agent works in the "workspace" folder next to start.py. To use another
 folder: python start.py --workdir C:\path\to\folder
 
