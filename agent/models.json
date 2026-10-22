@@ -1,0 +1,86 @@
+[
+  {
+    "key": "35b",
+    "name": "Qwen3.6-35B-A3B",
+    "note": "best quality; fast on a processor (mixture of experts)",
+    "tag": "qwen3.6-35b-a3b-q4-k-m",
+    "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+    "size": 22134528992,
+    "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
+    "gpu": "moe",
+    "parts": [
+      "9410960161ddd35a7c0876d6717d99340512d789904bb5b65c154d9527d89753",
+      "730ee3d393f9a49dbf9150ca326ca7de7e8903cc54e5dbcf6ceb74db02f5fc2c",
+      "722c5c3efe67c22f492c693708676528df81e69edb7b326ca503008792eea3b8",
+      "bd7686c48fe02eb08aa4a9d6302698c55e2564b454f8e0fbbb7fb46652dfe3fe",
+      "ce046b8ac93c1e452d5e45f1f416dce949b4ef2df9222b9b4ef2806a15eb4911",
+      "c61d79d44485877ab1b38c99b77207f3ab584bb39ef96bdbd8019d459530800e",
+      "028293916e1d914f14c8387da67ff4c9bbcb398275abb4399ebae2cffe24340f",
+      "3d9f97d212f69f55b91b0e5e216f934047590ba7ec4f2f72b35d6819a98528c0",
+      "4e80b8e3071bc3d03c63e948672771a893873ff1fadcaa1293f53963bad5228b",
+      "ea37d6b0ad6a3949798b141c438fd05194ca452bf572bf1e3d1886b3f7f2ff26",
+      "bd87cf0f7606845216f0be02aef9b4183c4d290c1ac6c0157b3f1be60495eff9",
+      "993294c84033115840d836f1f8ecb929c133d22111344663781a6505474ae189"
+    ]
+  },
+  {
+    "key": "gemma",
+    "name": "Gemma 4 26B-A4B",
+    "note": "Google; mixture of experts",
+    "tag": "gemma-4-26b-a4b-qat-q4-0",
+    "file": "gemma-4-26B_q4_0-it.gguf",
+    "size": 14439363584,
+    "sha256": "3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d",
+    "gpu": "moe",
+    "parts": []
+  },
+  {
+    "key": "35b-abliterated",
+    "name": "Qwen3.6-35B-A3B abliterated",
+    "note": "community edit without refusals",
+    "tag": "qwen3.6-35b-a3b-abliterated-q4-k-m",
+    "file": "Huihui-Qwen3.6-35B-A3B-abliterated.Q4_K_M.gguf",
+    "size": 21166758784,
+    "sha256": "fbaa4eb3e2365abffd495c5efa7df88c2b2a5088ba32cd2895973d130991e92b",
+    "gpu": "moe",
+    "parts": []
+  },
+  {
+    "key": "9b",
+    "name": "Qwen3.5-9B",
+    "note": "official; fits fully on an 8 GB graphics card",
+    "tag": "qwen3.5-9b-q4-k-m",
+    "file": "Qwen3.5-9B-Q4_K_M.gguf",
+    "size": 5680522464,
+    "sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
+    "gpu": "full",
+    "parts": []
+  },
+  {
+    "key": "9b-distill",
+    "name": "Qwen3.8-9B distill",
+    "note": "community distill (the first model)",
+    "tag": "qwen3.8-9b-q4-k-m",
+    "file": "Qwen3.8-9B-Q4_K_M.gguf",
+    "size": 5780090176,
+    "sha256": "df13d66021cef676f82be74053220fd75af6bf2a6a7fb77f5222ab9e50744a7a",
+    "gpu": "full",
+    "parts": [
+      "15ea33a95bd2113a1216981ab1674aa56959e16e006fdf4f4b320b139d315f35",
+      "51b933b61b4192ad2a71401ab8f47843ee43bc317d0ef292dd16a8c992ec8f0c",
+      "94b5be0fea2b7f36ff152adb4c36714d9cebb52a0e56363a546743e942c22978",
+      "c319a4ee35a766cfa4f841c262a838424a60d908ebdebf2256a5adf8a7ae8bd9"
+    ]
+  },
+  {
+    "key": "4b",
+    "name": "Qwen3.5-4B",
+    "note": "fastest; weaker with tools",
+    "tag": "qwen3.5-4b-q4-k-m",
+    "file": "Qwen3.5-4B-Q4_K_M.gguf",
+    "size": 2740937888,
+    "sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+    "gpu": "full",
+    "parts": []
+  }
+]

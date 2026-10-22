@@ -53,7 +53,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp agent/agent.py agent/start.py "agent/Start Agent.bat" bundle/local-agent/
+          cp agent/agent.py agent/start.py agent/models.json "agent/Start Agent.bat" bundle/local-agent/
           cp agent/BUNDLE-README.txt bundle/local-agent/README.txt
           (cd bundle && zip -qr ../local-agent-windows.zip local-agent)
           sha256sum local-agent-windows.zip > local-agent-windows.zip.sha256

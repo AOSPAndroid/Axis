@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Start the local agent: prepare the model, start llama-server, then open the agent.
 
-Double-click "Start Agent.bat", or run:  python start.py [--workdir DIR] [--model 35b|9b] [--cpu]
+Double-click "Start Agent.bat", or run:  python start.py [--workdir DIR] [--model KEY] [--cpu]
 Needs no internet access. The model parts are picked up from Downloads (or
 this folder, or %USERPROFILE%\\local-ai) and joined on first run.
 """
@@ -18,46 +18,11 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PART_SIZE = 1900000000
-PARTS_35B = [  # SHA-256 of each release part, from PARTS-SHA256SUMS.txt
-    "9410960161ddd35a7c0876d6717d99340512d789904bb5b65c154d9527d89753",
-    "730ee3d393f9a49dbf9150ca326ca7de7e8903cc54e5dbcf6ceb74db02f5fc2c",
-    "722c5c3efe67c22f492c693708676528df81e69edb7b326ca503008792eea3b8",
-    "bd7686c48fe02eb08aa4a9d6302698c55e2564b454f8e0fbbb7fb46652dfe3fe",
-    "ce046b8ac93c1e452d5e45f1f416dce949b4ef2df9222b9b4ef2806a15eb4911",
-    "c61d79d44485877ab1b38c99b77207f3ab584bb39ef96bdbd8019d459530800e",
-    "028293916e1d914f14c8387da67ff4c9bbcb398275abb4399ebae2cffe24340f",
-    "3d9f97d212f69f55b91b0e5e216f934047590ba7ec4f2f72b35d6819a98528c0",
-    "4e80b8e3071bc3d03c63e948672771a893873ff1fadcaa1293f53963bad5228b",
-    "ea37d6b0ad6a3949798b141c438fd05194ca452bf572bf1e3d1886b3f7f2ff26",
-    "bd87cf0f7606845216f0be02aef9b4183c4d290c1ac6c0157b3f1be60495eff9",
-    "993294c84033115840d836f1f8ecb929c133d22111344663781a6505474ae189",
-]
 RELEASES = "https://github.com/AOSPAndroid/tools/releases/tag/"
-# Preferred first. "parts" are the SHA-256 of each 1.9 GB release part, in order.
-MODELS = {
-    "35b": {
-        "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
-        "size": 22134528992,
-        "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
-        "release": RELEASES + "qwen3.6-35b-a3b-q4-k-m",
-        "parts": PARTS_35B,
-        # Mixture of experts: shared layers on the graphics card, experts in RAM.
-        "gpu": "moe",
-    },
-    "9b": {
-        "file": "Qwen3.8-9B-Q4_K_M.gguf",
-        "size": 5780090176,
-        "sha256": "df13d66021cef676f82be74053220fd75af6bf2a6a7fb77f5222ab9e50744a7a",
-        "release": RELEASES + "qwen3.8-9b-q4-k-m",
-        "parts": [
-            "15ea33a95bd2113a1216981ab1674aa56959e16e006fdf4f4b320b139d315f35",
-            "51b933b61b4192ad2a71401ab8f47843ee43bc317d0ef292dd16a8c992ec8f0c",
-            "94b5be0fea2b7f36ff152adb4c36714d9cebb52a0e56363a546743e942c22978",
-            "c319a4ee35a766cfa4f841c262a838424a60d908ebdebf2256a5adf8a7ae8bd9",
-        ],
-        "gpu": "full",
-    },
-}
+# Menu order. "parts" are the SHA-256 of each 1.9 GB release part; "gpu" is
+# "full" (whole model on the graphics card) or "moe" (experts stay in RAM).
+with open(os.path.join(HERE, "models.json")) as _f:
+    MODELS = {m["key"]: dict(m, release=RELEASES + m["tag"]) for m in json.load(_f)}
 PORT = 8080
 HOME = os.path.expanduser("~")
 SEARCH_DIRS = [HERE, os.path.dirname(HERE), os.path.join(HOME, "Downloads"), os.path.join(HOME, "local-ai")]
@@ -170,35 +135,75 @@ def parts_status(m):
     return found, joining
 
 
+def model_status(m):
+    """("ready", path), ("parts", None) when joinable, ("partial", found count) or (None, 0)."""
+    path = find_file(m["file"], m["size"])
+    if path:
+        return "ready", path
+    if not m["parts"]:
+        return None, 0  # parts not published yet
+    found, joining = parts_status(m)
+    if joining or all(found):
+        return "parts", None
+    count = sum(1 for p in found if p)
+    return ("partial", count) if count else (None, 0)
+
+
+def report_missing(m):
+    found, _ = parts_status(m)
+    log("%s is not ready yet. Missing or still downloading:" % m["name"])
+    for (name, _, _), p in zip(part_list(m), found):
+        if not p:
+            log("  " + name)
+    log("\nDownload them from %s" % m["release"])
+    log("(wait until none ends in .crdownload). Looked in:")
+    for d in SEARCH_DIRS:
+        log("  " + d)
+
+
+def choose(keys):
+    log("Models found:")
+    for i, key in enumerate(keys, 1):
+        log("  %d) %-30s %s" % (i, MODELS[key]["name"], MODELS[key]["note"]))
+    while True:
+        try:
+            answer = input("Choose a model [1]: ").strip()
+        except EOFError:
+            answer = ""
+        if not answer:
+            return keys[0]
+        if answer.isdigit() and 1 <= int(answer) <= len(keys):
+            return keys[int(answer) - 1]
+
+
 def prepare_model(choice=None):
-    """Return (model key, path). Uses the preferred model whose files are present."""
-    keys = [choice] if choice else list(MODELS)
-    for key in keys:
-        m = MODELS[key]
-        path = find_file(m["file"], m["size"])
-        if path:
-            return key, path
-        if not m["parts"]:
-            continue  # parts not published yet
-        found, joining = parts_status(m)
-        if joining or all(found):
-            return key, join_parts(m)
-        if any(found) or choice:
-            missing = [name for (name, _, _), p in zip(part_list(m), found) if not p]
-            log("The %s model is not ready yet. Missing or still downloading:" % m["file"])
-            for name in missing:
-                log("  " + name)
-            log("\nDownload them from %s" % m["release"])
-            log("(wait until none ends in .crdownload). Looked in:")
-            for d in SEARCH_DIRS:
-                log("  " + d)
-            others = [k for k in MODELS if k != key]
-            if others and not choice:
-                log("\nTo use the other model meanwhile, run: start.py --model %s" % others[0])
+    """Return (model key, path), asking which model to use when several are present."""
+    status = {key: model_status(m) for key, m in MODELS.items()}
+    if choice:
+        key = choice
+    else:
+        usable = [k for k, (state, _) in status.items() if state in ("ready", "parts")]
+        partial = [k for k, (state, _) in status.items() if state == "partial"]
+        if not usable:
+            if partial:
+                report_missing(MODELS[partial[0]])
+            else:
+                log("No model found. Download all the parts of one of these into Downloads:")
+                for m in MODELS.values():
+                    log("  %-30s %s" % (m["name"], m["release"]))
             sys.exit(1)
-    log("No model found. Download the parts of one of these into Downloads:")
-    for m in MODELS.values():
-        log("  %s  %s" % (m["file"], m["release"]))
+        for k in partial:
+            log("Still downloading: %s (%d of %d parts)" % (MODELS[k]["name"], status[k][1], len(MODELS[k]["parts"])))
+        key = usable[0] if len(usable) == 1 else choose(usable)
+    state, path = status[key]
+    if state == "ready":
+        return key, path
+    if state == "parts":
+        return key, join_parts(MODELS[key])
+    if MODELS[key]["parts"]:
+        report_missing(MODELS[key])
+    else:
+        log("%s has not been published yet: %s" % (MODELS[key]["name"], MODELS[key]["release"]))
     sys.exit(1)
 
 
@@ -289,7 +294,7 @@ def main():
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
                    help="folder the agent works in (default: the workspace folder here)")
     p.add_argument("--ctx", type=int, default=8192, help="context size in tokens")
-    p.add_argument("--model", choices=list(MODELS), help="which model to use (default: the best one present)")
+    p.add_argument("--model", choices=list(MODELS), help="which model to use (default: ask when several are present)")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--cpu", action="store_true", help="always run on the processor")
     g.add_argument("--gpu", action="store_true", help="try the graphics card even if none was detected")
