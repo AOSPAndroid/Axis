@@ -11,6 +11,7 @@ The screenshots show the real Axis interface. The PC names, people and values in
 - [Everyday use](#everyday-use)
 - [Your notes](#your-notes)
 - [Thinking mode](#thinking-mode)
+- [Axis Cloud: your Copilot license](#axis-cloud-your-copilot-license)
 - [Options](#options)
 - [Troubleshooting](#troubleshooting)
 - [Updating](#updating)
@@ -146,6 +147,34 @@ It's slower, so it's off by default.
 
 **K2-Horizon-MoVA always thinks.** Axis turns thinking on for it automatically and shows the reasoning in grey before each answer, so you can follow what it's checking and why. It also gets a larger context (16384) so the reasoning fits.
 
+## Axis Cloud: your Copilot license
+
+`Copilot Chat.bat` opens **Axis Cloud**, a chat with the models in your GitHub Copilot license, such as GPT-6.1 Sol or Claude Opus 5.5. It uses GitHub's official Copilot SDK, so each message counts against your Copilot plan like any other Copilot use.
+
+It's a plain chat: the model can't run commands, open files or browse. When a command would help, it writes it out for you to run. Unlike Axis, **your messages go to GitHub Copilot in the cloud**, so only use it for what your Copilot license is approved for.
+
+**You need:**
+
+- a **GitHub Copilot** license (Business or Enterprise). Microsoft 365 Copilot, the one in Word and Teams, doesn't work with it.
+- Python 3.11 or newer
+- internet access from the command line to GitHub. If your work PC blocks it, this won't connect there.
+
+**First start:**
+
+1. Double-click **`Copilot Chat.bat`**. If GitHub's Copilot SDK isn't installed, it offers to install it with `pip`.
+2. Sign in. If you've signed in to the GitHub CLI (`gh auth login`) or the Copilot CLI before, it uses that. Otherwise create a [fine-grained personal access token](https://github.com/settings/personal-access-tokens) with the account that has your Copilot license, give it the **Copilot Requests** permission, and paste it in. It isn't shown while you type, and Axis Cloud can keep it encrypted for your Windows account so you only do this once.
+3. It picks GPT-6.1 Sol if your license offers it and shows `Axis Cloud is ready`.
+
+| Command | What it does |
+| --- | --- |
+| `/models` | Lists the models your license offers. |
+| `/model 2` | Switches to model 2 from the list (or type part of its name). The chat starts afresh. |
+| `/reset` | Clears the chat. |
+| `/forget` | Deletes the saved token. |
+| `/exit` | Quits. |
+
+The model's reasoning, when it shares it, appears in grey after `thinking:`. Ctrl+C stops a reply. Start it with `--effort high` for more reasoning on hard questions, or `--model NAME` to pick a model straight away. It uses the Windows proxy setting automatically.
+
 ## Options
 
 Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened in the `local-agent` folder.
@@ -166,11 +195,12 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | Problem | What to do |
 | --- | --- |
 | "Python was not found" | Run `start.py` with the full path to `python.exe`, for example `C:\devhome\tools\python3.12\current\python.exe start.py`. |
-| "The system cannot find the path specified" at the start | Harmless. It comes from a Windows Command Prompt start-up setting, not from Axis. |
+| "The system cannot find the path specified" at the start | Fixed in the current version: update Axis. It came from the launcher's Python check and was harmless. |
 | "The model is not ready yet" | One or more parts are missing or still downloading. Axis lists them. Download them and start again. |
 | It stops while loading the model | Look at `server.log` in the `local-agent` folder. For memory errors, try `--ctx 4096`, or a smaller model. |
 | Answers are slow | Check the speed line. If "wrote" is under about 8 per second, use Qwen3.6-35B-A3B. On a PC with a weak graphics card, compare with `--cpu`. |
 | The answer is wrong or made up | Ask it to check with a command, add the facts to your notes, or use K2-Horizon-MoVA or `--think` for hard questions. |
+| Axis Cloud: "Could not start or reach GitHub Copilot" | This PC can't reach GitHub from the command line, or the proxy needs settings. Start it with `--debug` for details, and ask IT whether the Copilot CLI is allowed. |
 | "The reply was cut off" | The model's reasoning filled the context. Type `/reset`, or start Axis with a larger `--ctx`, for example `--ctx 32768`. |
 
 ## Updating
@@ -182,3 +212,4 @@ Download [local-agent-windows.zip](https://github.com/AOSPAndroid/Axis/releases/
 - The model runs on your PC. Your questions and the command output stay on your PC.
 - Axis only changes something after you type `y`. Its file tools only work inside its working folder, but its commands run with your Windows account's rights: read-only commands can read anything you can, and changes reach anything you can change. Read each change before approving it.
 - Run Axis under the same account you'd use to do the work by hand.
+- Axis Cloud (`Copilot Chat.bat`) is the exception: it sends your messages to GitHub Copilot. Use it only for what your Copilot license is approved for.

@@ -29,6 +29,7 @@ The screenshots show the real Axis interface. The PC names, people and values in
 - **Fixes things** with your approval: starts and stops services, ends stuck processes, restarts PCs. It reads the state first, asks before the change and checks the result afterwards.
 - **Uses your notes**: runbooks and known fixes in the `notes` folder, searched before it guesses.
 - **Shows its work**: every command, its output, and a speed line after each answer.
+- **Axis Cloud** (optional): `Copilot Chat.bat` chats with the models in your GitHub Copilot license, such as GPT-6.1 Sol, through GitHub's official SDK. Those messages go to the cloud; see the [guide](docs/GUIDE.md#axis-cloud-your-copilot-license).
 
 ## Models
 

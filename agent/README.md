@@ -66,6 +66,10 @@ Put runbooks, procedures, known fixes and names as `.md` or `.txt` files in the 
 
 `--think` turns on the model's reasoning and shows it, dimmed, before the answer. It's slower. In `models.json`, `"think": true` makes `start.py` always pass `--think` for that model (K2-Horizon-MoVA reasons before every answer), and `ctx`, `temperature` and `top_p` set its defaults. `server_args` adds llama-server options. A model that comes in several GGUF files lists them under `files`, each with its own parts; `start.py` joins each one, keeps them in one folder and gives llama-server the first.
 
+## Axis Cloud
+
+`copilot_chat.py` (`Copilot Chat.bat`) is a separate, plain chat with the models in a GitHub Copilot license, through GitHub's official [Copilot SDK](https://github.com/github/copilot-sdk) (`pip install github-copilot-sdk`, Python 3.11+). Sessions are created with no tools (`available_tools=[]`) and any permission request is rejected. Sign-in uses the SDK's own chain (`COPILOT_GITHUB_TOKEN`/`GH_TOKEN`, a Copilot CLI login, then `gh`), then a fine-grained token kept encrypted with Windows DPAPI in `%APPDATA%\Axis\copilot-token.bin`. On Windows it passes the system proxy to the runtime when `HTTPS_PROXY` isn't set. Options: `--model`, `--effort`, `--debug` (show the SDK's own error details).
+
 ## Notes
 
 - On Windows, commands run in Windows PowerShell. Read-only commands (`Get-*`, `Test-Connection`, filtering and formatting cmdlets, `ipconfig /all`, `whoami`, `quser`, `sc.exe query` and similar) run without asking: PowerShell's own parser checks each command first. Anything that changes something or runs a script still asks. Commands run with your user's permissions. The folder restriction applies to the file tools only. A command can reach anything you can, so read each one before you approve it, and save `--yes` for folders you don't mind losing.
