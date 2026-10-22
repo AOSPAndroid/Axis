@@ -1,0 +1,31 @@
+name: Test local agent
+on:
+  push:
+    paths: ['agent/**', '.github/workflows/agent-tests.yml']
+  pull_request:
+    paths: ['agent/**', '.github/workflows/agent-tests.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Python 3.8 has no build for the newest Ubuntu runner image.
+          - os: ubuntu-22.04
+            python: '3.8'
+          - os: ubuntu-latest
+            python: '3.12'
+          - os: windows-latest
+            python: '3.8'
+          - os: windows-latest
+            python: '3.12'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m unittest discover -s agent/tests -v

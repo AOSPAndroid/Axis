@@ -1,0 +1,166 @@
+name: Mirror models
+
+on:
+  push:
+    branches: [claude/local-agent]
+    paths: ['.github/workflows/model-mirror.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    name: ${{ matrix.tag }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - tag: qwen3.8-27b-q4-k-m
+            title: Qwen3.8-27B Q4_K_M (best at terminal tasks, 16.5 GB)
+            hf_repo: unsloth/Qwen3.8-27B-GGUF
+            hf_rev: 4ca720788d1e01f1bff70c033e0d0028fd02e502
+            file: Qwen3.8-27B-UD-Q4_K_M.gguf
+            size: '16464440224'
+            sha256: 322e194ff79741c7baa497c240f677f54b201b0efab44ca8e50f122b39123482
+            about: >-
+              Official Qwen3.8-27B (August 2026), quantized by Unsloth. Dense model: strongest
+              at terminal and coding tasks in this list, but slow on a processor.
+          - tag: gemma-4-26b-a4b-qat-q4-0
+            title: Gemma 4 26B-A4B QAT Q4_0 (Google, 14.4 GB)
+            hf_repo: google/gemma-4-26B-A4B-it-qat-q4_0-gguf
+            hf_rev: d1c082be9cf3c8a514acf63b8761f4b41935842e
+            file: gemma-4-26B_q4_0-it.gguf
+            size: '14439363584'
+            sha256: 3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d
+            about: Google's own quantization-aware-trained Q4_0 build. Mixture of experts, about 4B active per token.
+          - tag: qwen3.6-35b-a3b-q4-k-m
+            title: Qwen3.6-35B-A3B Q4_K_M (CPU, 32 GB+ RAM)
+            hf_repo: unsloth/Qwen3.6-35B-A3B-GGUF
+            hf_rev: a483e9e6cbd595906af30beda3187c2663a1118c
+            file: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+            size: '22134528992'
+            sha256: ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61
+            about: Official Qwen3.6-35B-A3B, quantized by Unsloth. Mixture of experts, about 3B active per token.
+          - tag: qwen3.6-35b-a3b-abliterated-q4-k-m
+            title: Qwen3.6-35B-A3B abliterated Q4_K_M (21.2 GB)
+            hf_repo: mradermacher/Huihui-Qwen3.6-35B-A3B-abliterated-GGUF
+            hf_rev: 0693fc2b47f66380f4b568b01e05195d22edd3a2
+            file: Huihui-Qwen3.6-35B-A3B-abliterated.Q4_K_M.gguf
+            size: '21166758784'
+            sha256: fbaa4eb3e2365abffd495c5efa7df88c2b2a5088ba32cd2895973d130991e92b
+            about: >-
+              Community model. huihui-ai removed refusal behaviour from Qwen3.6-35B-A3B
+              (abliteration); quantized by mradermacher. Not an official Qwen release; it may be
+              less reliable than the original and will not decline harmful requests.
+          - tag: qwen3.5-9b-abliterated-q4-k-m
+            title: Qwen3.5-9B abliterated Q4_K_M (5.6 GB)
+            hf_repo: mradermacher/Huihui-Qwen3.5-9B-abliterated-GGUF
+            hf_rev: 9f646d7eda193ddf2348134f3bff3d49eed7a2c6
+            file: Huihui-Qwen3.5-9B-abliterated.Q4_K_M.gguf
+            size: '5627045248'
+            sha256: ea1858ef4dc4b648b8dbb44612962a0333e945060dd0545ac0f28d7c4416e4b3
+            about: >-
+              Community model. huihui-ai removed refusal behaviour from Qwen3.5-9B
+              (abliteration); quantized by mradermacher. Not an official Qwen release; it may be
+              less reliable than the original and will not decline harmful requests.
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ matrix.tag }}
+      MODEL: ${{ matrix.file }}
+      HF_REPO: ${{ matrix.hf_repo }}
+      HF_REV: ${{ matrix.hf_rev }}
+      MODEL_SIZE: ${{ matrix.size }}
+      MODEL_SHA256: ${{ matrix.sha256 }}
+      ABOUT: ${{ matrix.about }}
+      PART_SIZE: '1900000000'
+    steps:
+      - name: Skip if already published
+        id: check
+        shell: bash
+        run: |
+          if gh release view "$TAG" --json isDraft --jq .isDraft 2> /dev/null | grep -qx false; then
+            echo "Release $TAG is already published; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Free disk space
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h .
+
+      - name: Download pinned model in parts and verify
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://huggingface.co/$HF_REPO/resolve/$HF_REV/$MODEL"
+          mkdir -p parts assets
+          count=$(( (MODEL_SIZE + PART_SIZE - 1) / PART_SIZE ))
+          for i in $(seq 1 "$count"); do
+            start=$(( (i - 1) * PART_SIZE ))
+            end=$(( i * PART_SIZE - 1 ))
+            if [ "$end" -ge "$MODEL_SIZE" ]; then end=$(( MODEL_SIZE - 1 )); fi
+            want=$(( end - start + 1 ))
+            file=$(printf 'parts/%s.part%03d' "$MODEL" "$i")
+            for attempt in 1 2 3 4 5; do
+              if curl --fail --location --silent --show-error --connect-timeout 30 --retry 3 --retry-all-errors \
+                   --range "$start-$end" --output "$file" "$url" && [ "$(stat -c %s "$file")" -eq "$want" ]; then
+                break
+              fi
+              echo "Part $i attempt $attempt failed; retrying."
+              sleep 15
+            done
+            test "$(stat -c %s "$file")" -eq "$want"
+            echo "Part $i of $count: $want bytes"
+          done
+          actual=$(cat parts/* | sha256sum | cut -d' ' -f1)
+          echo "SHA-256 of joined parts: $actual"
+          test "$actual" = "$MODEL_SHA256"
+          (cd parts && sha256sum ./* | sed 's#  \./#  #' > ../assets/PARTS-SHA256SUMS.txt)
+          printf '%s  %s\n' "$MODEL_SHA256" "$MODEL" > assets/MODEL-SHA256SUM.txt
+          curl --fail --location --silent --show-error "https://huggingface.co/$HF_REPO/resolve/$HF_REV/README.md" -o assets/UPSTREAM-MODEL-CARD.md
+          curl --fail --location --silent --show-error https://www.apache.org/licenses/LICENSE-2.0.txt -o assets/LICENSE-APACHE-2.0.txt
+          cat assets/PARTS-SHA256SUMS.txt
+          cat > assets/README.txt <<EOF
+          $MODEL
+
+          $ABOUT
+          License: Apache-2.0 (attached).
+          Source: https://huggingface.co/$HF_REPO
+          Revision: $HF_REV
+          Weights mirrored without modification; split for transport.
+
+          Original bytes: $MODEL_SIZE
+          SHA256: $MODEL_SHA256
+
+          Download ALL $count .part files into Downloads. They are raw byte chunks,
+          not loadable on their own. The local agent's start.py finds them,
+          verifies and joins them automatically.
+          EOF
+
+      - name: Publish release
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5 6; do
+            if gh release view "$TAG" > /dev/null 2>&1; then break; fi
+            # Tag main's head: it is already on the default branch.
+            if gh release create "$TAG" --target main --draft --latest=false \
+                 --title "${{ matrix.title }}" --notes-file assets/README.txt; then break; fi
+            echo "Creating the release failed (attempt $attempt); response headers:"
+            GH_DEBUG=api gh api -X POST "repos/$GH_REPO/releases" -f tag_name="$TAG" -f target_commitish=main \
+              -F draft=true -f name="${{ matrix.title }}" 2>&1 | grep -iE '^< (HTTP|x-accepted|x-github-sso|x-ratelimit-remaining|retry-after)|message' || true
+            sleep 60
+          done
+          gh release view "$TAG" > /dev/null
+          gh release upload "$TAG" assets/* parts/* --clobber
+          gh release edit "$TAG" --draft=false --latest=false --title "${{ matrix.title }}" --notes-file assets/README.txt
+          gh release view "$TAG" --json url,assets --jq '.url, (.assets[] | "\(.name) \(.size)")'

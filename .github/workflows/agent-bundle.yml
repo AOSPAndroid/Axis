@@ -1,0 +1,108 @@
+name: Build local agent bundle
+
+on:
+  push:
+    branches: [main]
+    paths: ['agent/**', '.github/workflows/agent-bundle.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-bundle
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: local-agent-windows
+      LLAMA_TAG: b11815
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download llama.cpp Windows builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Pinned: a version known to work with the agent. Change LLAMA_TAG to upgrade on purpose.
+          for attempt in 1 2 3; do
+            if gh api "repos/ggml-org/llama.cpp/releases/tags/$LLAMA_TAG" > llama-release.json; then break; fi
+            echo "GitHub API failed (attempt $attempt); retrying."; sleep 15
+          done
+          jq -e .tag_name llama-release.json > /dev/null
+          tag=$(jq -r .tag_name llama-release.json)
+          echo "Using llama.cpp $tag"
+          mkdir -p bundle/local-agent
+          for kind in cpu vulkan; do
+            url=$(jq -r --arg k "$kind" '.assets[] | select(.name | test("bin-win-" + $k + "-x64\\.zip$")) | .browser_download_url' llama-release.json | head -n 1)
+            if [ -z "$url" ]; then
+              echo "No Windows $kind x64 build in llama.cpp $tag. Assets:"; jq -r '.assets[].name' llama-release.json; exit 1
+            fi
+            curl --fail --location --retry 3 --silent --show-error "$url" -o "$kind.zip"
+            unzip -q "$kind.zip" -d "bundle/local-agent/llama-$kind"
+            test -n "$(find "bundle/local-agent/llama-$kind" -name llama-server.exe)"
+          done
+          echo "llama.cpp $tag" > bundle/local-agent/LLAMA-CPP-VERSION.txt
+
+      - name: Assemble bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp agent/agent.py agent/it_tools.py agent/it_windows.ps1 agent/terminal_ui.py agent/web_tools.py agent/start.py agent/models.json "agent/Start Agent.bat" bundle/local-agent/
+          mkdir -p bundle/local-agent/notes && cp agent/notes/EXAMPLE.md bundle/local-agent/notes/
+          cp agent/BUNDLE-README.txt bundle/local-agent/README.txt
+          echo "$GITHUB_SHA" > bundle/local-agent/BUNDLE-COMMIT.txt
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('bundle/local-agent/Start Agent.bat')
+          path.write_bytes(path.read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
+          PY
+          (cd bundle && zip -qr ../local-agent-windows.zip local-agent)
+          sha256sum local-agent-windows.zip > local-agent-windows.zip.sha256
+          ls -l local-agent-windows.zip
+
+      - name: Verify bundle
+        shell: bash
+        run: |
+          python - <<'PY'
+          import ast
+          import os
+          from pathlib import Path
+          import zipfile
+          modules = ('agent.py', 'it_tools.py', 'terminal_ui.py', 'web_tools.py', 'start.py')
+          with zipfile.ZipFile('local-agent-windows.zip') as archive:
+              assert archive.testzip() is None, 'Corrupt ZIP member'
+              names = archive.namelist()
+              required = modules + ('it_windows.ps1', 'models.json', 'Start Agent.bat', 'README.txt', 'notes/EXAMPLE.md', 'BUNDLE-COMMIT.txt')
+              for name in required:
+                  data = archive.read('local-agent/' + name)
+                  assert data, 'Empty bundle file: ' + name
+                  if name in modules:
+                      ast.parse(data.decode('utf-8'), feature_version=(3, 8))
+                  if name in modules + ('it_windows.ps1', 'models.json'):
+                      assert data == (Path('agent') / name).read_bytes(), 'Stale bundle file: ' + name
+              for kind in ('cpu', 'vulkan'):
+                  assert any(name.startswith('local-agent/llama-' + kind + '/') and name.endswith('/llama-server.exe') for name in names), 'Missing llama.cpp ' + kind + ' server'
+              assert not any(name.lower().endswith('.gguf') for name in names), 'Models must remain separate'
+              assert archive.read('local-agent/BUNDLE-COMMIT.txt').decode().strip() == os.environ['GITHUB_SHA']
+          print('Verified all runtime modules, launchers, both llama.cpp builds and source commit.')
+          PY
+
+      - name: Publish release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --latest=false \
+              --title "Local agent for Windows" --notes-file agent/BUNDLE-README.txt
+          fi
+          gh release upload "$TAG" local-agent-windows.zip local-agent-windows.zip.sha256 --clobber
+          gh release edit "$TAG" --notes-file agent/BUNDLE-README.txt
+          # This is a rolling release; keep its source tag with the published ZIP.
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" \
+            -f sha="$GITHUB_SHA" -F force=true > /dev/null
+          gh release view "$TAG" --json url,assets --jq '.url, (.assets[] | "\(.name) \(.size)")'

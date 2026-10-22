@@ -1,0 +1,116 @@
+[
+  {
+    "key": "35b",
+    "name": "Qwen3.6-35B-A3B",
+    "note": "fast; good at terminal tasks (default)",
+    "tag": "qwen3.6-35b-a3b-q4-k-m",
+    "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+    "size": 22134528992,
+    "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
+    "parts": [
+      "9410960161ddd35a7c0876d6717d99340512d789904bb5b65c154d9527d89753",
+      "730ee3d393f9a49dbf9150ca326ca7de7e8903cc54e5dbcf6ceb74db02f5fc2c",
+      "722c5c3efe67c22f492c693708676528df81e69edb7b326ca503008792eea3b8",
+      "bd7686c48fe02eb08aa4a9d6302698c55e2564b454f8e0fbbb7fb46652dfe3fe",
+      "ce046b8ac93c1e452d5e45f1f416dce949b4ef2df9222b9b4ef2806a15eb4911",
+      "c61d79d44485877ab1b38c99b77207f3ab584bb39ef96bdbd8019d459530800e",
+      "028293916e1d914f14c8387da67ff4c9bbcb398275abb4399ebae2cffe24340f",
+      "3d9f97d212f69f55b91b0e5e216f934047590ba7ec4f2f72b35d6819a98528c0",
+      "4e80b8e3071bc3d03c63e948672771a893873ff1fadcaa1293f53963bad5228b",
+      "ea37d6b0ad6a3949798b141c438fd05194ca452bf572bf1e3d1886b3f7f2ff26",
+      "bd87cf0f7606845216f0be02aef9b4183c4d290c1ac6c0157b3f1be60495eff9",
+      "993294c84033115840d836f1f8ecb929c133d22111344663781a6505474ae189"
+    ]
+  },
+  {
+    "key": "27b",
+    "name": "Qwen3.8-27B",
+    "note": "newest; best at terminal tasks, but slow",
+    "tag": "qwen3.8-27b-q4-k-m",
+    "file": "Qwen3.8-27B-UD-Q4_K_M.gguf",
+    "size": 16464440224,
+    "sha256": "322e194ff79741c7baa497c240f677f54b201b0efab44ca8e50f122b39123482",
+    "parts": [
+      "690f3bf4aa60846cd44e449df65032342f7357f6e13b6d5461b52861987fa729",
+      "1bab31b0d94b6ebe9d9d98a2b36ac47a2a877fe2526c4bf1716751555807fa07",
+      "048833cffab159af688f6a2b68efffd3332659442519e68228cc2486b4cf9035",
+      "92f9a8668a5f66a8efc6070fc71e5d43d7d0fde410014d00a06d1513b610e62b",
+      "b7b7be0ba97a64b21e79cb5e4903171b2cb1edf2d1ba32c8af95129c6fb76878",
+      "1f4db1016fd72c67021dc757359af6d8a66746458aa09f1602a6d4910706bec0",
+      "cce1f7f0d47c584ba3d21483b5ca31bb241227df1ae4f379affc86d82cb314ac",
+      "3cae06251f8d9e9ac8081acf13f1bc49555c33d7c4828814c145e3ca12c69059",
+      "28577764298d3d657a396aaa25aad8e114955d722631fd1da03767ba4b1a7589"
+    ]
+  },
+  {
+    "key": "gemma",
+    "name": "Gemma 4 26B-A4B",
+    "note": "Google; fast",
+    "tag": "gemma-4-26b-a4b-qat-q4-0",
+    "file": "gemma-4-26B_q4_0-it.gguf",
+    "size": 14439363584,
+    "sha256": "3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d",
+    "parts": [
+      "19f24caa6bb6f9e9357ff05abd82f9fba2183597ff5944ecb69a4f50b6ba2a49",
+      "b8403698a8909d9e2874ec93f279c9f9cb51f3600112f40c848dae4b0e48ff19",
+      "71104c304b193db51d9e0f367f8ffb69ccee5baa920fc246fd279dcb855789e9",
+      "1c318576ca6263a372ceb6c23f19a2631464ee3c73ed9c2c1e720305c2047ad6",
+      "8eaeb3d72a7289ccd8060bd68a27e7c1421251ed56642e1638c18da2174c629d",
+      "ee3a885e9b15d793283a5e6b6ea794f28c243f1e25cff6b836085b82b742728e",
+      "8ee2c460464ff63a55f16d10795e707748f54b84ae1e0d6976bef55acaf16ed4",
+      "c8ac907975bf12cccf6d7376ca4a4e5a5e31ade6845371badcdbfe05c93a2f2e"
+    ]
+  },
+  {
+    "key": "35b-abliterated",
+    "name": "Qwen3.6-35B-A3B abliterated",
+    "note": "fast; community edit without refusals",
+    "tag": "qwen3.6-35b-a3b-abliterated-q4-k-m",
+    "file": "Huihui-Qwen3.6-35B-A3B-abliterated.Q4_K_M.gguf",
+    "size": 21166758784,
+    "sha256": "fbaa4eb3e2365abffd495c5efa7df88c2b2a5088ba32cd2895973d130991e92b",
+    "parts": [
+      "6baf77c0c2d995c987fef01a75d058921bb4f21d1d820a4d0b61494e63b83ba9",
+      "204e4990b380222ab54414ada98ea95744a16890ba7d76c1b8c797e7d4a275df",
+      "b66d4b4718f1cf4bb3511890469902448d71ae097fd6ea7a637cabbc2e1b29ed",
+      "1ce4a565e408cbcda95d76450fe51379f2fa9d8ab1f929eea943fa56c6e6858b",
+      "d76cd351a26a6cee1f1d786a0cdc26b0c85460c983de15a4b3b36d1a6c4379d0",
+      "b7200466b6076ba44fe7e1c8c4d60b85bd1768065c15c95e5de013bd5da1aa94",
+      "8966c03d33c07a9ceb42ad8bc1ef31db33754f7fc932fbf9b3a6fa67506d4d21",
+      "a84da1460db0bb20c4293e25f1067d9c3416481f65487a9f40f76c7dff7ebe22",
+      "2075cae74fb66db7dc5646a8ae10cd6c64389702f8f8bff75bc31badf3728506",
+      "dce4267fce56d1c56f2957b6fa4d58bfbe39b49cef033ee9790d5a9a99965cad",
+      "47c123e93605d475e76bbb9df30911cae63d1549f72a8b3ad999c9fca71b5968",
+      "01cff8b89b22f0d0be0ff29b008ce1aa63dc0a080f9032c6949d07cc817dfc54"
+    ]
+  },
+  {
+    "key": "9b-abliterated",
+    "name": "Qwen3.5-9B abliterated",
+    "note": "smaller; community edit without refusals",
+    "tag": "qwen3.5-9b-abliterated-q4-k-m",
+    "file": "Huihui-Qwen3.5-9B-abliterated.Q4_K_M.gguf",
+    "size": 5627045248,
+    "sha256": "ea1858ef4dc4b648b8dbb44612962a0333e945060dd0545ac0f28d7c4416e4b3",
+    "parts": [
+      "847663c0467b0252797133c1ad14b9ae0232c14f240f72a2fb493574d40a92fa",
+      "6839c538116c1796081b330575a09afdfa370e7485cf28a646ed958f38c35ee4",
+      "112f624c8018ba13b8f05bce39e5cfaafe871a95964ea971f1e3a9b9c63d93f1"
+    ]
+  },
+  {
+    "key": "9b-distill",
+    "name": "Qwen3.8-9B distill",
+    "note": "community distill (the first model)",
+    "tag": "qwen3.8-9b-q4-k-m",
+    "file": "Qwen3.8-9B-Q4_K_M.gguf",
+    "size": 5780090176,
+    "sha256": "df13d66021cef676f82be74053220fd75af6bf2a6a7fb77f5222ab9e50744a7a",
+    "parts": [
+      "15ea33a95bd2113a1216981ab1674aa56959e16e006fdf4f4b320b139d315f35",
+      "51b933b61b4192ad2a71401ab8f47843ee43bc317d0ef292dd16a8c992ec8f0c",
+      "94b5be0fea2b7f36ff152adb4c36714d9cebb52a0e56363a546743e942c22978",
+      "c319a4ee35a766cfa4f841c262a838424a60d908ebdebf2256a5adf8a7ae8bd9"
+    ]
+  }
+]
