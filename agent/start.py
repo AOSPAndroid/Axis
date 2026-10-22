@@ -41,7 +41,8 @@ MODELS = {
         "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
         "release": RELEASES + "qwen3.6-35b-a3b-q4-k-m",
         "parts": PARTS_35B,
-        "gpu": False,  # 22 GB will not fit on an office graphics card
+        # Mixture of experts: shared layers on the graphics card, experts in RAM.
+        "gpu": "moe",
     },
     "9b": {
         "file": "Qwen3.8-9B-Q4_K_M.gguf",
@@ -54,13 +55,14 @@ MODELS = {
             "94b5be0fea2b7f36ff152adb4c36714d9cebb52a0e56363a546743e942c22978",
             "c319a4ee35a766cfa4f841c262a838424a60d908ebdebf2256a5adf8a7ae8bd9",
         ],
-        "gpu": True,
+        "gpu": "full",
     },
 }
 PORT = 8080
 HOME = os.path.expanduser("~")
 SEARCH_DIRS = [HERE, os.path.dirname(HERE), os.path.join(HOME, "Downloads"), os.path.join(HOME, "local-ai")]
 GPU_WORDS = ("nvidia", "radeon", "amd", "intel(r) arc")
+MOE_MIN_VRAM = 3500000000  # Windows caps the reported value at 4 GB
 CHUNK = 8 << 20
 
 
@@ -202,16 +204,36 @@ def prepare_model(choice=None):
 
 # ---- llama-server ----------------------------------------------------------
 
-def gpu_names():
+def gpus():
+    """[(name, memory in bytes)] of the display adapters. Memory is capped at 4 GB."""
     if os.name != "nt":
         return []
     try:
         out = subprocess.run(["powershell", "-NoProfile", "-Command",
-                              "(Get-CimInstance Win32_VideoController).Name"],
+                              "Get-CimInstance Win32_VideoController | "
+                              "ForEach-Object { '{0}|{1}' -f $_.AdapterRAM, $_.Name }"],
                              capture_output=True, text=True, timeout=30).stdout
     except (OSError, subprocess.SubprocessError):
         return []
-    return [line.strip() for line in out.splitlines() if line.strip()]
+    result = []
+    for line in out.splitlines():
+        ram, _, name = line.strip().partition("|")
+        if name:
+            result.append((name.strip(), int(ram) if ram.isdigit() else 0))
+    return result
+
+
+def gpu_mode(model_key, adapters, force):
+    """How to use the graphics card for this model: "full", "moe" or None (processor only)."""
+    mode = MODELS[model_key]["gpu"]
+    if force:
+        return mode
+    discrete = [ram for name, ram in adapters if any(w in name.lower() for w in GPU_WORDS)]
+    if not discrete:
+        return None
+    if mode == "moe" and max(discrete) < MOE_MIN_VRAM:
+        return None
+    return mode
 
 
 def find_server(folder):
@@ -231,10 +253,12 @@ def server_ready():
         return False
 
 
-def start_server(exe, model, ctx, gpu):
+def start_server(exe, model, ctx, mode):
     log_path = os.path.join(HERE, "server.log")
     cmd = [exe, "-m", model, "-c", str(ctx), "--jinja", "--host", "127.0.0.1", "--port", str(PORT),
-           "-ngl", "99" if gpu else "0", "--temp", "0.6", "--top-p", "0.95", "--top-k", "20"]
+           "-ngl", "99" if mode else "0", "--temp", "0.6", "--top-p", "0.95", "--top-k", "20"]
+    if mode == "moe":
+        cmd += ["--n-cpu-moe", "999"]  # keep every expert layer in RAM
     with open(log_path, "w") as log_file:
         try:
             proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=os.path.dirname(exe))
@@ -279,18 +303,18 @@ def main():
     if server_ready():
         log("Using the llama-server already running on port %d." % PORT)
     else:
-        gpus = gpu_names()
-        has_gpu = any(w in n.lower() for n in gpus for w in GPU_WORDS)
-        log("Graphics: %s" % (", ".join(gpus) or "unknown"))
-        try_gpu = a.gpu or (has_gpu and MODELS[key]["gpu"] and not a.cpu)
-        builds = ["vulkan", "cpu"] if try_gpu else ["cpu"]
+        adapters = gpus()
+        log("Graphics: %s" % (", ".join(name for name, _ in adapters) or "unknown"))
+        mode = None if a.cpu else gpu_mode(key, adapters, a.gpu)
+        builds = ["vulkan", "cpu"] if mode else ["cpu"]
         for build in builds:
             exe = find_server(os.path.join(HERE, "llama-" + build))
             if not exe:
                 log("No llama-%s folder next to start.py; skipping." % build)
                 continue
-            log("Starting llama-server (%s), loading the model" % ("graphics card" if build == "vulkan" else "processor"))
-            proc = start_server(exe, model, a.ctx, build == "vulkan")
+            where = {"full": "graphics card", "moe": "graphics card + processor"}.get(mode) if build == "vulkan" else "processor"
+            log("Starting llama-server (%s), loading the model" % where)
+            proc = start_server(exe, model, a.ctx, mode if build == "vulkan" else None)
             if proc:
                 break
             if build == "vulkan":
