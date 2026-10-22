@@ -8,13 +8,19 @@ It needs Python 3.8 or newer and nothing else.
 
 Keep `agent.py`, `it_tools.py` and `it_windows.ps1` together. Both setup and the Windows bundle include them. To update an existing bundle, replace these files plus `start.py`; keep your models, notes and `state` folder.
 
-Set the root folder that contains your package folders, then start normally:
+Start normally; the pictured OneDrive package repository is already the default:
 
 ```bat
-python start.py --model 35b --package-repo "D:\Packages"
+python start.py --model 35b
 ```
 
-`AGENT_PACKAGE_REPO` can set the same path; the existing `WMI_PACKAGE_REPO` variable is also accepted. A synced OneDrive/SharePoint folder or an accessible UNC share can be used. The agent never invents this path or requires Atlas's database. Without a repository, chat, machine inspection and other IT tools still work.
+Default repository:
+
+```text
+C:\Users\x01426046\OneDrive - Barclays Bank PLC\Shortcuts\EPP_PACKAGE_REPO_BetaPackages - BetaPackages
+```
+
+`--package-repo`, `AGENT_PACKAGE_REPO`, or `WMI_PACKAGE_REPO` can override this path if needed. Keep the OneDrive shortcut synced and accessible to the account running the agent. Atlas's database is not needed. If the folder is unavailable, chat, machine inspection and other IT tools still work.
 
 Example requests (replace `PC-123` with your intended target):
 
@@ -102,7 +108,7 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--ctx` | `16384` | Must match the server's `-c`; older history is compacted to fit |
 | `--yes` | off | Approve writes and commands without asking |
 | `--think` | off | Turn on Qwen's thinking mode: better on hard tasks, slower, uses more context |
-| `--package-repo` | `AGENT_PACKAGE_REPO` / `WMI_PACKAGE_REPO` | Root containing deployable package folders |
+| `--package-repo` | OneDrive BetaPackages folder above; environment variables override | Root containing deployable package folders |
 | `--state-dir` | `state` next to agent.py | Durable jobs, snapshots and full tool results |
 | `--max-steps` | `30` | Maximum model/tool rounds per request (1–200) |
 | `--deployment-timeout` | `3600` | Copy/installer monitoring timeout in seconds (60–86400) |

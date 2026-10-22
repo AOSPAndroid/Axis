@@ -46,9 +46,11 @@ If something fails, server.log in this folder has llama-server's output.
 
 Standalone IT actions: inspect PCs, deploy/install/uninstall/repair packages,
 control services/processes, check AD, reboot with monitoring and open remote
-support tools. Configure the package folder when starting:
-  python start.py --model 35b --package-repo "D:\Packages"
-AGENT_PACKAGE_REPO (or WMI_PACKAGE_REPO) can set the same folder.
+support tools. The package folder is already configured; start with:
+  python start.py --model 35b
+Default package folder:
+  C:\Users\x01426046\OneDrive - Barclays Bank PLC\Shortcuts\EPP_PACKAGE_REPO_BetaPackages - BetaPackages
+--package-repo, AGENT_PACKAGE_REPO or WMI_PACKAGE_REPO can override it.
 WMI/file sharing and your Windows account's rights must permit the operation;
 AD lookup needs RSAT. The default context is 16384 tokens; --ctx 8192 reduces it.
 

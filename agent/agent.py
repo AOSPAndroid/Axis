@@ -21,7 +21,7 @@ import urllib.error
 import urllib.request
 import uuid
 
-from it_tools import ITTools, TOOLS as IT_TOOLS, TOOL_NAMES as IT_TOOL_NAMES
+from it_tools import DEFAULT_PACKAGE_REPO, ITTools, TOOLS as IT_TOOLS, TOOL_NAMES as IT_TOOL_NAMES
 
 MAX_TOOL_OUTPUT = 3000   # chars of tool output sent back to the model (start and end kept)
 MAX_STEPS = 30           # model/tool rounds per task (configurable)
@@ -765,8 +765,8 @@ def main():
     p.add_argument("--ctx", type=int, default=16384, help="context size the server was started with (-c)")
     p.add_argument("--think", action="store_true", help="enable the model's thinking mode (slower; shows its reasoning)")
     p.add_argument("--notes", help="notes folder (default: the notes folder next to agent.py)")
-    p.add_argument("--package-repo", default=os.environ.get("AGENT_PACKAGE_REPO") or os.environ.get("WMI_PACKAGE_REPO"),
-                   help="local/UNC folder containing package folders and their installer scripts")
+    p.add_argument("--package-repo", default=os.environ.get("AGENT_PACKAGE_REPO") or os.environ.get("WMI_PACKAGE_REPO") or DEFAULT_PACKAGE_REPO,
+                   help="package root (default: the configured OneDrive BetaPackages folder)")
     p.add_argument("--state-dir", help="folder for durable IT jobs, snapshots and full tool output (default: state next to agent.py)")
     p.add_argument("--max-steps", type=int, default=MAX_STEPS, help="maximum model/tool rounds per task (1-200)")
     p.add_argument("--deployment-timeout", type=int, default=3600, help="copy/installer monitoring timeout in seconds (60-86400)")

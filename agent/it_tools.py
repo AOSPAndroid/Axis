@@ -59,6 +59,7 @@ SUFFIXES = {"Install": ("_i", "_install", "_installs"),
             "Repair": ("_r", "_repair", "_repairs")}
 ACTIVE = {"queued", "running"}
 REMOTE_ROOT = r"C:\Temp\LocalAgent"
+DEFAULT_PACKAGE_REPO = r"C:\Users\x01426046\OneDrive - Barclays Bank PLC\Shortcuts\EPP_PACKAGE_REPO_BetaPackages - BetaPackages"
 
 
 class UnknownOutcome(RuntimeError):
@@ -205,7 +206,8 @@ def target_lock(state_dir, pc):
 class ITTools:
     def __init__(self, state_dir, package_repo=None, confirm=None, timeout=3600):
         self.state = Path(state_dir).expanduser().resolve()
-        self.repository = Path(os.path.expandvars(package_repo)).expanduser().resolve() if package_repo else None
+        package_repo = package_repo or os.environ.get("AGENT_PACKAGE_REPO") or os.environ.get("WMI_PACKAGE_REPO") or DEFAULT_PACKAGE_REPO
+        self.repository = Path(os.path.expandvars(package_repo)).expanduser().resolve()
         self.confirm = confirm or (lambda action: False)
         self.timeout = integer(timeout, "Deployment timeout", 60, 86400)
 
@@ -255,8 +257,6 @@ class ITTools:
         return data
 
     def root(self):
-        if self.repository is None:
-            raise ValueError("Set --package-repo or AGENT_PACKAGE_REPO to your synced package repository")
         if not self.repository.is_dir():
             raise ValueError("Package repository is unavailable: " + str(self.repository))
         return self.repository
