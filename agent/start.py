@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start the local agent: prepare the model, start llama-server, then open the agent.
+"""Start Axis: prepare the model, start llama-server, then open the assistant.
 
 Double-click "Start Agent.bat", or run:  python start.py [--workdir DIR] [--model KEY] [--cpu]
 Needs no internet access. The model parts are picked up from Downloads (or
@@ -308,7 +308,7 @@ def server_model():
 
 
 def main():
-    p = argparse.ArgumentParser(description="Start llama-server and the local agent.")
+    p = argparse.ArgumentParser(description="Start llama-server and Axis.")
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
                    help="folder the agent works in (default: the workspace folder here)")
     p.add_argument("--ctx", type=int, default=16384, help="context size in tokens")
@@ -350,7 +350,7 @@ def main():
             sys.exit("Could not start llama-server. Details are in %s" % os.path.join(HERE, "server.log"))
 
     try:
-        log("\nAgent working folder: %s" % os.path.abspath(a.workdir))
+        log("\nAxis working folder: %s" % os.path.abspath(a.workdir))
         return wait_for_agent([sys.executable, os.path.join(HERE, "agent.py"), "--model", alias,
                                "--workdir", a.workdir, "--ctx", str(a.ctx)] + agent_args)
     finally:

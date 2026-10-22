@@ -1,12 +1,12 @@
-# Local agent
+# Axis
 
-A general-purpose assistant that runs on your own model through llama-server or LM Studio. It chats, searches and reads public web pages, works with project files, and has standalone Windows IT tools for package deployment, machine inspection, service/process controls, AD lookup and remote support. Atlas does not need to be installed or running. File tools stay inside the working folder; IT tools use the explicitly configured package repository and selected Windows PCs. Changes ask for approval unless you start with `--yes`.
+Axis is a general-purpose assistant that runs on your own model through llama-server or LM Studio. It chats, searches and reads public web pages, works with project files, and has standalone Windows IT tools for package deployment, machine inspection, service/process controls, AD lookup and remote support. Atlas does not need to be installed or running. File tools stay inside the working folder; IT tools use the explicitly configured package repository and selected Windows PCs. Changes ask for approval unless you start with `--yes`.
 
 It needs Python 3.8 or newer and nothing else.
 
 ## Terminal interface
 
-The console opens with the active model, context, thinking/approval mode, workspace and package repository. Responses stream below clearly labelled tool activity; inspections and deployment results use compact tables. Web searches show titles, snippets and source URLs; page reads show an excerpt, links and the next text offset when more is available. During model/tool work an elapsed-time indicator runs in interactive terminals. Reasoning stays compact by default; add `--verbose` to show reasoning (with `--think`) and complete tool results.
+The console opens with an AXIS ASCII logo, the active model, context, thinking/approval mode, workspace and package repository. Narrow terminals and `--plain` use a compact AXIS heading. Responses appear under AXIS with clearly labelled tool activity; inspections and deployment results use compact tables. Web searches show titles, snippets and source URLs; page reads show an excerpt, links and the next text offset when more is available. During model/tool work an elapsed-time indicator runs in interactive terminals. Reasoning stays compact by default; add `--verbose` to show reasoning (with `--think`) and complete tool results.
 
 The interface uses the standard library and keeps normal terminal scrollback. It adapts to narrow windows, falls back to ASCII when needed, honours `NO_COLOR`, and supports `--plain` for output without colour or animation. Model/file/command text cannot inject terminal control sequences. Approval panels show the complete wrapped action, with control characters made visible.
 

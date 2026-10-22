@@ -1,4 +1,4 @@
-"""Compact terminal presentation for the local agent; standard library, Python 3.8+.
+"""Compact terminal presentation for Axis; standard library, Python 3.8+.
 
 Keeps normal console scrollback. Windows Console, Windows Terminal, redirected
 output and NO_COLOR all use the same interface with graceful fallbacks.
@@ -12,6 +12,15 @@ import sys
 import threading
 import time
 import unicodedata
+
+
+AXIS_LOGO = (
+    r"    _    __  __ ___ ____",
+    r"   / \   \ \/ /|_ _/ ___|",
+    "  / _ \\   \\  /  | |\\___ \\",
+    r" / ___ \  /  \  | | ___) |",
+    r"/_/   \_\/_/\_\|___|____/",
+)
 
 
 _ANSI = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]|\x1b[@-_]", re.S)
@@ -207,12 +216,17 @@ class TerminalUI:
     def banner(self, model, workdir, ctx, thinking, auto_approve, package_repo=None):
         self._prepare()
         with self._lock:
+            if not self.plain and self.width >= max(map(len, AXIS_LOGO)) + 4:
+                self._line()
+                for row in AXIS_LOGO:
+                    self._line(row, "accent", prefix="  ", bold=True)
+                self._line()
             details = [str(model), "Context %s  |  Thinking %s  |  Approval %s" % (
                 format(ctx, ","), "on" if thinking else "off", "automatic (--yes)" if auto_approve else "ask before changes"),
                 "Workspace  " + str(workdir)]
             if package_repo:
                 details.append("Packages   " + str(package_repo))
-            self._box("LOCAL AGENT", details)
+            self._box("AXIS", details)
             self._line("/help commands   /jobs deployments   /paste multiline", "dim")
 
     def notice(self, message, tone="info"):
@@ -269,7 +283,7 @@ class TerminalUI:
         self.end_thinking()
         with self._lock:
             if not self._response_open:
-                self._heading("ASSISTANT")
+                self._heading("AXIS")
                 self._response_open = True
                 self._response_bold = False
                 self._pending_star = ""

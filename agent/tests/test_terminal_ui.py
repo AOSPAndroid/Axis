@@ -66,7 +66,7 @@ class TerminalUITests(unittest.TestCase):
             ui.write_response(piece)
         ui.end_response()
         self.assertIn("Hello world and *single", stream.getvalue())
-        self.assertEqual(stream.getvalue().count("[ASSISTANT]"), 1)
+        self.assertEqual(stream.getvalue().count("[AXIS]"), 1)
         self.assertNotIn("**", stream.getvalue())
 
     def test_reasoning_is_compact_unless_verbose(self):

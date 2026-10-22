@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-step setup for the local agent on Windows (Python 3.8+, standard library only).
+"""One-step setup for Axis on Windows (Python 3.8+, standard library only).
 
 Downloads and verifies the Qwen3.8-9B model, downloads llama.cpp for your GPU,
 fetches the agent, and writes start-server.bat and agent.bat into one folder.
@@ -252,7 +252,8 @@ def write_launchers(root, server, model):
     agent = os.path.join(root, "agent.bat")
     with open(agent, "w", newline="\r\n") as f:
         f.write('@echo off\n'
-                'rem Runs the agent in the current folder. Extra options are passed through.\n'
+                'title Axis\n'
+                'rem Runs Axis in the current folder. Extra options are passed through.\n'
                 'if "%%CTX%%"=="" set CTX=16384\n'
                 '"%s" "%s" --workdir "%%CD%%" --ctx %%CTX%% %%*\n' % (sys.executable, os.path.join(root, "agent.py")))
     return start, agent

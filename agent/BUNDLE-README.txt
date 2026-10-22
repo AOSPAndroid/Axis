@@ -1,5 +1,5 @@
-Local agent for Windows
-=======================
+Axis for Windows
+================
 
 Contents: the agent, a launcher, and llama.cpp builds for the processor
 (llama-cpu) and for graphics cards (llama-vulkan). Models are separate.
@@ -7,7 +7,9 @@ Keep agent.py, it_tools.py, it_windows.ps1, terminal_ui.py and web_tools.py
 together.
 Atlas is not needed.
 
-The terminal shows the model/workspace, readable tool activity and job tables.
+The terminal opens with the AXIS ASCII logo and shows the model/workspace,
+readable tool activity and job tables. Responses are labelled AXIS.
+Narrow terminals and --plain use a compact AXIS heading.
 /help lists commands. /jobs checks deployments without using the model;
 /status shows settings; /output reads saved tool results; /paste enters a
 multiline request (finish with a single . line). Ctrl+C cancels the current

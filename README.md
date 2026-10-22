@@ -1,4 +1,12 @@
-# Qwen3.8-9B Distill — Q4_K_M
+# Axis
+
+A local AI assistant with a terminal interface, public web research and standalone Windows IT tools.
+
+**[Download Axis for Windows (local-agent-windows.zip)](https://github.com/AOSPAndroid/Axis/releases/download/local-agent-windows/local-agent-windows.zip)**
+
+Extract the ZIP, copy your full GGUF model into the `local-agent` folder beside `Start Agent.bat`, then double-click the launcher. Python 3.8 or newer is required. See the [agent guide](agent/README.md) for supported models, tools and settings.
+
+## Qwen3.8-9B Distill — Q4_K_M
 
 Model download and instructions for an 8 GB VRAM setup.
 

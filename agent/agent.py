@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal local agent for an OpenAI-compatible server (llama-server or LM Studio).
+"""Axis, a local assistant for an OpenAI-compatible server (llama-server or LM Studio).
 
 Python 3.8+ standard library only. Usage:
     python agent.py                      # interactive
@@ -29,7 +29,7 @@ from web_tools import WebTools, TOOLS as WEB_TOOLS, TOOL_NAMES as WEB_TOOL_NAMES
 MAX_TOOL_OUTPUT = 3000   # chars of tool output sent back to the model (start and end kept)
 MAX_STEPS = 30           # model/tool rounds per task (configurable)
 
-SYSTEM_PROMPT = """You are a helpful assistant running locally on the user's Windows computer. You chat, answer questions, explain, write and translate like any assistant. You can also use tools to work with files and run PowerShell commands on this computer and on other computers by name.
+SYSTEM_PROMPT = """You are Axis, a helpful assistant running locally on the user's Windows computer. You chat, answer questions, explain, write and translate like any assistant. You can also use tools to work with files and run PowerShell commands on this computer and on other computers by name.
 
 ## When to use tools
 - Only when the request needs them: information from a computer, file or website, or an action. For greetings, tests, general questions, writing or explanations, just answer without running anything.
@@ -935,7 +935,7 @@ def paste_request(ui, input_fn=None):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description="Local agent for an OpenAI-compatible server.")
+    p = argparse.ArgumentParser(description="Axis, a local assistant for an OpenAI-compatible server.")
     p.add_argument("task", nargs="*", help="run one task and exit")
     p.add_argument("--url", default=os.environ.get("AGENT_URL", "http://127.0.0.1:8080/v1"),
                    help="server base URL (LM Studio: http://127.0.0.1:1234/v1)")
