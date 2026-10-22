@@ -28,6 +28,7 @@ SYSTEM_PROMPT = """You are a helpful assistant running locally on the user's Win
 ## When to use tools
 - Only when the request needs them: information from a computer or file, or an action. For greetings, tests, general questions, writing or explanations, just answer without running anything.
 - If the request is unclear, ask a short question instead of guessing.
+- Never invent facts about computers, people, files or settings. Get them with a tool, or say you don't know. When you report results, use the real values from the output.
 
 ## This computer
 {facts}
@@ -47,7 +48,7 @@ Working directory for the file tools: {workdir}
 - Processes: re-read by ProcessId right before $p.Terminate(). Never end System, smss, csrss, wininit, services, lsass or winlogon.
 - Remote task: Invoke-WmiMethod -ComputerName PC -Class Win32_Process -Name Create -ArgumentList 'cmd.exe /c ...'
 - Active Directory, read-only unless asked: Import-Module ActiveDirectory; Get-ADUser, Get-ADComputer or Get-ADGroup -Identity name -Properties ...; stop if a search matches more than one.
-- Inside another computer: C:\\Data\\PsExec.exe \\\\PC -accepteula -nobanner -n 10 -h powershell.exe -NoProfile -NonInteractive -Command "..."
+- Prefer WMI for other computers. Use PsExec only when WMI cannot give what you need, such as the output of a command run inside the other computer: C:\\Data\\PsExec.exe \\\\PC -accepteula -nobanner -n 10 -h powershell.exe -NoProfile -NonInteractive -Command "..."
 """
 
 # Collected once at startup and put in the system prompt.
@@ -128,8 +129,9 @@ class Agent:
     # ---- model -----------------------------------------------------------
 
     def chat(self):
-        body = {"model": self.model, "messages": self.messages, "tools": TOOLS,
-                "temperature": 0.6, "top_p": 0.95, "top_k": 20}
+        # Thinking mode uses Qwen's recommended sampling; otherwise stay close to the evidence.
+        sampling = {"temperature": 0.6, "top_p": 0.95} if self.think else {"temperature": 0.3, "top_p": 0.9}
+        body = dict({"model": self.model, "messages": self.messages, "tools": TOOLS, "top_k": 20}, **sampling)
         if not self.think:
             body["chat_template_kwargs"] = {"enable_thinking": False}
         req = urllib.request.Request(
