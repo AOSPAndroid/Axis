@@ -28,7 +28,7 @@ RELEASE = os.environ.get(
     "https://github.com/AOSPAndroid/tools/releases/download/qwen3.8-9b-q4-k-m")
 AGENT_URL = os.environ.get(
     "SETUP_AGENT_URL",
-    "https://raw.githubusercontent.com/AOSPAndroid/tools/claude/local-agent/agent/agent.py")
+    "https://raw.githubusercontent.com/AOSPAndroid/tools/main/agent/agent.py")
 LLAMA_API = "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=50"
 LLAMA_RELEASES = "https://github.com/ggml-org/llama.cpp/releases"
 CHUNK = 1 << 20

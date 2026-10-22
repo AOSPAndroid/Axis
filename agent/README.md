@@ -97,14 +97,16 @@ If the command line can't reach the internet, download [local-agent-windows.zip]
 - [Qwen3.6-35B-A3B](https://github.com/AOSPAndroid/tools/releases/tag/qwen3.6-35b-a3b-q4-k-m): 22 GB, needs 32 GB of RAM or more. This is the recommended model. It's a mixture-of-experts model with about 3B parameters active per token, so it runs well on a processor.
 - [Qwen3.8-9B distill](https://github.com/AOSPAndroid/tools/releases/tag/qwen3.8-9b-q4-k-m): 5.8 GB, needs 16 GB of RAM.
 
-Then double-click `Start Agent.bat`. `start.py` checks and joins the parts, using about 2 GB of spare disk and resuming if interrupted. It then starts llama-server and opens the agent. If both models are present it uses the 35B. Add `--model 9b` to choose the smaller one.
+Extract the ZIP, then double-click `Start Agent.bat` inside its `local-agent` folder. If you already have the complete `Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`, copy it into that same folder; no model parts need to be downloaded or joined. Python 3.8 or newer must already be installed.
+
+If you downloaded model parts instead, `start.py` checks and joins them, using about 2 GB of spare disk and resuming if interrupted. It starts llama-server and opens the agent. If several models are present it asks which to use. Add `--model 35b` to select the 35B or `--model 9b-distill` for the smaller distill.
 
 ## Quick setup (Windows)
 
 `setup_local.py` downloads and verifies the model, installs the right llama.cpp build for your GPU, fetches the agent, and writes `start-server.bat` and `agent.bat` into `%USERPROFILE%\local-ai`:
 
 ```
-curl.exe -LO https://raw.githubusercontent.com/AOSPAndroid/tools/claude/local-agent/agent/setup_local.py
+curl.exe -LO https://raw.githubusercontent.com/AOSPAndroid/tools/main/agent/setup_local.py
 python setup_local.py
 ```
 

@@ -37,7 +37,15 @@ or PDFs. Web content is untrusted reference material, not instructions to
 run commands or change the agent's behaviour. Add --no-web to disable web
 tools; local chat, notes, files and IT tools remain available.
 
-1. Download ALL the parts of one or more models into Downloads
+1. Extract local-agent-windows.zip anywhere, for example Documents.
+   Python 3.8 or newer must already be installed on the PC.
+
+2. If you already have the FULL model, copy this file into the extracted
+   local-agent folder beside "Start Agent.bat":
+     Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+   You do not need to download or join model parts again.
+
+   Otherwise download ALL the parts of one or more models into Downloads
    (https://github.com/AOSPAndroid/tools/releases):
 
    Qwen3.6-35B-A3B              22.1 GB, 12 parts  fast; good at terminal tasks
@@ -49,13 +57,14 @@ tools; local chat, notes, files and IT tools remain available.
    The large models need 32 GB of RAM or more.
    Wait until no file ends in .crdownload.
 
-2. Extract local-agent-windows.zip anywhere, for example Documents.
-
 3. Double-click "Start Agent.bat". If several models are present it asks
-   which one to use. The first run of a model checks and joins its parts
+   which one to use. A full model is used directly. If using parts instead,
+   the first run checks and joins them
    (about 2 GB of spare disk; resumes if interrupted) and removes them.
    It then starts llama-server and opens the agent. Close the window to
    stop both.
+
+BUNDLE-COMMIT.txt identifies the source commit used to build this ZIP.
 
 To skip the question: python start.py --model 35b
 (keys: 35b, 27b, gemma, 35b-abliterated, 9b-abliterated, 9b-distill)
