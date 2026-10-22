@@ -1,0 +1,64 @@
+name: Build local agent bundle
+
+on:
+  push:
+    branches: [claude/local-agent]
+    paths: ['agent/**', '.github/workflows/agent-bundle.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-bundle
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: local-agent-windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download llama.cpp Windows builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/ggml-org/llama.cpp/releases/latest > llama-release.json
+          tag=$(jq -r .tag_name llama-release.json)
+          mkdir -p bundle/local-agent
+          for kind in cpu vulkan; do
+            url=$(jq -r --arg k "$kind" '.assets[] | select(.name | test("bin-win-" + $k + "-x64\\.zip$")) | .browser_download_url' llama-release.json | head -n 1)
+            if [ -z "$url" ]; then
+              echo "No Windows $kind x64 build in llama.cpp $tag. Assets:"; jq -r '.assets[].name' llama-release.json; exit 1
+            fi
+            curl --fail --location --retry 3 --silent --show-error "$url" -o "$kind.zip"
+            unzip -q "$kind.zip" -d "bundle/local-agent/llama-$kind"
+            test -n "$(find "bundle/local-agent/llama-$kind" -name llama-server.exe)"
+          done
+          echo "llama.cpp $tag" > bundle/local-agent/LLAMA-CPP-VERSION.txt
+
+      - name: Assemble bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp agent/agent.py agent/start.py "agent/Start Agent.bat" bundle/local-agent/
+          cp agent/BUNDLE-README.txt bundle/local-agent/README.txt
+          (cd bundle && zip -qr ../local-agent-windows.zip local-agent)
+          sha256sum local-agent-windows.zip > local-agent-windows.zip.sha256
+          ls -l local-agent-windows.zip
+
+      - name: Publish release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --latest=false \
+              --title "Local agent for Windows" --notes-file agent/BUNDLE-README.txt
+          fi
+          gh release upload "$TAG" local-agent-windows.zip local-agent-windows.zip.sha256 --clobber
+          gh release edit "$TAG" --notes-file agent/BUNDLE-README.txt
+          gh release view "$TAG" --json url,assets --jq '.url, (.assets[] | "\(.name) \(.size)")'
