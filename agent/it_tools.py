@@ -345,8 +345,10 @@ class ITTools:
             job.update(state="failed", error=str(error), finished=now())
             write_json(path, job)
             raise
-        return {"job_id": job_id, "state": "queued", "computers": job["computers"],
-                "message": "Accepted for background processing. Call it_job_status; this is not installation or reboot success."}
+        message = ("Reboot queued; completion is not yet verified. Progress and boot-time verification: /jobs %s." % job_id
+                   if job["kind"] == "reboot" else
+                   "Accepted for background processing. Call it_job_status; this is not installation success.")
+        return {"job_id": job_id, "state": "queued", "computers": job["computers"], "message": message}
 
     def deploy_package(self, computers, package, script, action, mode="full"):
         if not isinstance(computers, list) or not 1 <= len(computers) <= 200:

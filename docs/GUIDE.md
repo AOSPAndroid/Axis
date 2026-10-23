@@ -112,7 +112,7 @@ Axis follows the same routine for every fix: it reads the current state, says wh
 
 Good to know:
 
-- Structured reboot actions create a monitored job; `/jobs` reports progress and verification.
+- Structured reboot actions create a monitored job. Axis reports the queued job ID and returns to chat unless you asked it to wait or verify; `/jobs ID` reports progress and boot-time verification. Queued does not mean the reboot has completed.
 - Deployment results distinguish script exit 0, restart-required codes 3010/1641, failures and unknown outcomes. Script completion does not verify application health.
 - Structured service/process tools enforce protected targets and recheck identity against a recent inspection. General shell commands run with your Windows account's rights.
 - Ctrl+C cancels the current chat request. Accepted background deployment/reboot jobs continue; inspect their status before retrying an uncertain operation.
