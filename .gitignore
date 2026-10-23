@@ -3,4 +3,7 @@ __pycache__/
 agent/state/
 agent/server.log
 agent/workspace/
+agent/data/
+agent/*.db*
+agent/*.sqlite*
 firecrawl.key

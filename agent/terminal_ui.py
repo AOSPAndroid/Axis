@@ -38,7 +38,8 @@ _TITLES = {"inspect_computer": "Inspect computer", "find_packages": "Find packag
            "open_remote_tool": "Remote support", "run_command": "PowerShell command",
            "list_dir": "List folder", "read_file": "Read file", "write_file": "Write file",
            "search_notes": "Search notes", "read_note": "Read note", "read_tool_output": "Read saved output",
-           "web_search": "Search web", "web_read": "Read web page"}
+           "web_search": "Search web", "web_read": "Read web page",
+           "search_atlas": "Search Atlas", "read_atlas_record": "Read Atlas record"}
 _STATES = {"queued": "QUEUED", "running": "RUNNING", "complete": "FINISHED",
            "failed": "FAILED", "unknown": "UNKNOWN", "declined": "DECLINED",
            "copied": "COPIED", "script_succeeded": "SCRIPT EXIT 0", "reboot_required": "REBOOT REQUIRED",
@@ -253,7 +254,7 @@ class TerminalUI:
         with self._lock:
             self._line("[OK] " + str(message), "success", prefix="  ")
 
-    def banner(self, model, workdir, ctx, thinking, auto_approve, package_repo=None, web=None):
+    def banner(self, model, workdir, ctx, thinking, auto_approve, package_repo=None, web=None, atlas=None):
         self._prepare()
         with self._lock:
             self._logo()
@@ -262,6 +263,8 @@ class TerminalUI:
                 "Workspace  " + str(workdir)]
             if web:
                 details.append("WEB    " + str(web))
+            if atlas:
+                details.append("ATLAS  " + str(atlas))
             if package_repo:
                 details.append("Packages   " + str(package_repo))
             self._box("AXIS", details)
@@ -498,7 +501,7 @@ class TerminalUI:
             self._heading(self._label("tool", _TITLES.get(name, clean_text(name).replace("_", " ").title())))
             if isinstance(args, dict):
                 fields = []
-                for key in ("computer", "computers", "view", "action", "package", "script", "name", "pid", "query", "url", "offset", "link_offset", "path", "identity", "command"):
+                for key in ("computer", "computers", "view", "action", "package", "script", "name", "pid", "query", "kind", "id", "url", "offset", "link_offset", "path", "identity", "command"):
                     if key in args:
                         value = args[key]
                         value = ", ".join(str(v) for v in value) if isinstance(value, list) else str(value)
@@ -518,7 +521,7 @@ class TerminalUI:
             return "." * width
         return value[:_take(value, width - _width(mark))] + mark
 
-    def _table(self, headers, rows, limit=10):
+    def _table(self, headers, rows, limit=10, preserve_columns=()):
         headers = [clean_text(h) for h in headers]
         rows = [[clean_text("" if v is None else v) for v in row] for row in rows]
         shown = rows if self.verbose else rows[:limit]
@@ -529,6 +532,8 @@ class TerminalUI:
         minimum = [min(max(7, _width(h)), 18) for h in headers]
         sizes = [max([_width(h)] + [_width(row[i]) for row in shown]) for i, h in enumerate(headers)]
         sizes = [max(minimum[i], min(size, 36)) for i, size in enumerate(sizes)]
+        for i in preserve_columns:
+            minimum[i] = sizes[i] = max([_width(headers[i])] + [_width(row[i]) for row in shown])
         while sum(sizes) > available and any(sizes[i] > minimum[i] for i in range(len(sizes))):
             i = max(range(len(sizes)), key=lambda n: sizes[n] - minimum[n])
             sizes[i] -= 1
@@ -575,6 +580,8 @@ class TerminalUI:
                 self._web_search_body(data)
             elif isinstance(data, dict) and name == "web_read":
                 self._web_read_body(data)
+            elif isinstance(data, dict) and name in ("search_atlas", "read_atlas_record"):
+                self._atlas_body(name, data)
             elif isinstance(data, dict) and ("jobs" in data or (name == "it_job_status" and "id" in data)):
                 self._jobs_body(data)
             elif isinstance(data, dict):
@@ -590,6 +597,61 @@ class TerminalUI:
             if output_id:
                 footer += "  |  /output " + clean_text(output_id)
             self._line(footer, "dim", prefix="  ")
+
+    def _atlas_body(self, name, data):
+        source = data.get("source") or {}
+        if source.get("path"):
+            self._line("Database (read-only)  " + str(source["path"]), "dim", prefix="  ")
+        if source.get("directory_imported_at"):
+            self._line("Directory imported  " + str(source["directory_imported_at"]), "dim", prefix="  ")
+        if data.get("warning"):
+            self._line(data["warning"], "dim", prefix="  ")
+        if data.get("error"):
+            self._line(data["error"], "error", prefix="  ")
+            return
+        if name == "search_atlas":
+            items = data.get("items") or []
+            if not items:
+                self._line("No matching Atlas records.", "dim", prefix="  ")
+            self._atlas_items(items)
+        else:
+            record = data.get("record") or {}
+            labels = {"id": "Record ID", "status": "Inventory status",
+                      "last_logon_user": "Last logged on (inventory)", "assigned_to": "Assigned to",
+                      "device_kind": "Device type"}
+            for key, value in record.items():
+                if value is not None and value != "" and key not in ("kind", "windows_remote_supported"):
+                    self._line(labels.get(key, key.replace("_", " ").capitalize()) + "  " + str(value), prefix="  ")
+            self._atlas_target_note(record)
+            items = data.get("links") or []
+            self._line("Linked records", "dim", prefix="  ")
+            if not items:
+                self._line("No linked records returned.", "dim", prefix="  ")
+            self._atlas_items(items, linked=True)
+        self._line("%d returned  |  offset %s" % (len(items), data.get("offset", 0)), "dim", prefix="  ")
+        if data.get("next_offset") is not None:
+            self._line("More %s: %s with offset %s" % (
+                "linked records" if name == "read_atlas_record" else "matches", name, data["next_offset"]), "dim", prefix="  ")
+
+    def _atlas_items(self, items, linked=False):
+        for kind in ("people", "computers"):
+            rows = [item for item in items if item.get("kind") == kind]
+            if not rows:
+                continue
+            self._line(kind.title(), "dim", prefix="  ")
+            fields = [("id", "Record ID"), ("name", "Name")]
+            if linked:
+                fields.append(("relationship", "Relationship"))
+            fields.append(("account", "Account") if kind == "people" else ("device_kind", "Device type"))
+            self._table([label for _, label in fields], [[row.get(key, "") for key, _ in fields] for row in rows],
+                        preserve_columns=(0, 2) if linked else (0,))
+            for row in rows if self.verbose else rows[:10]:
+                self._atlas_target_note(row)
+
+    def _atlas_target_note(self, record):
+        if record.get("windows_remote_supported") is False:
+            self._line("Windows actions unsupported for %s (device type or inventory-only ID)." % record.get("id", "this record"),
+                       "warning", prefix="  ")
 
     def _web_search_body(self, data):
         if data.get("error"):

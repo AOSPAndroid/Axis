@@ -53,7 +53,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp agent/agent.py agent/it_tools.py agent/it_windows.ps1 agent/terminal_ui.py agent/web_tools.py agent/start.py agent/models.json "agent/Start Agent.bat" "agent/Configure Firecrawl.bat" bundle/local-agent/
+          cp agent/agent.py agent/it_tools.py agent/it_windows.ps1 agent/terminal_ui.py agent/web_tools.py agent/atlas_db.py agent/start.py agent/models.json "agent/Start Agent.bat" "agent/Configure Firecrawl.bat" bundle/local-agent/
           mkdir -p bundle/local-agent/notes && cp agent/notes/EXAMPLE.md bundle/local-agent/notes/
           cp agent/BUNDLE-README.txt bundle/local-agent/README.txt
           echo "$GITHUB_SHA" > bundle/local-agent/BUNDLE-COMMIT.txt
@@ -74,7 +74,7 @@ jobs:
           import os
           from pathlib import Path
           import zipfile
-          modules = ('agent.py', 'it_tools.py', 'terminal_ui.py', 'web_tools.py', 'start.py')
+          modules = ('agent.py', 'it_tools.py', 'terminal_ui.py', 'web_tools.py', 'atlas_db.py', 'start.py')
           with zipfile.ZipFile('local-agent-windows.zip') as archive:
               assert archive.testzip() is None, 'Corrupt ZIP member'
               names = archive.namelist()
@@ -90,6 +90,7 @@ jobs:
                   assert any(name.startswith('local-agent/llama-' + kind + '/') and name.endswith('/llama-server.exe') for name in names), 'Missing llama.cpp ' + kind + ' server'
               assert not any(name.lower().endswith('.gguf') for name in names), 'Models must remain separate'
               assert not any(name.lower().endswith(('firecrawl.key', '.env')) for name in names), 'Credentials must remain outside the bundle'
+              assert not any(name.lower().endswith(('.db', '.sqlite', '.sqlite3', '-wal', '-shm')) for name in names), 'Private databases must remain outside the bundle'
               assert archive.read('local-agent/BUNDLE-COMMIT.txt').decode().strip() == os.environ['GITHUB_SHA']
           print('Verified all runtime modules, launchers, both llama.cpp builds and source commit.')
           PY

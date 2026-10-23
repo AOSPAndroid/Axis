@@ -6,6 +6,8 @@
 
 Axis has its own deployment, directory and machine inspection tools. **Atlas does not need to be installed or running.**
 
+**Atlas database lookup:** place your `office_atlas.db` beside `Start Agent.bat`, or use `"Start Agent.bat" --atlas-db "F:\Atlas\DB\office_atlas.db"`. Axis can search people, accounts and computers and read their stored assignment links, using a read-only local connection. [Database setup](docs/GUIDE.md#atlas-database).
+
 ![Axis ASCII interface showing public web research](docs/images/06-ascii-ui.png)
 
 Actual terminal renderer with scripted example data. Your questions appear in purple, Axis's answers in cyan, and thinking in grey, with small role icons in supported terminals. Axis keeps its simple ASCII logo, labelled tool panels and small rotating spinner. Thinking is displayed as it arrives, with expanded tool results; final replies focus on the result or the next decision. Use `--compact` for shorter tool summaries. The interface uses only Python's standard library; animations stop while you type. Run `Start Agent.bat --plain` for a compact display without colour, icons or motion.

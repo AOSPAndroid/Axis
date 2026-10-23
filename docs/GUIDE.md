@@ -16,6 +16,7 @@ On Windows, use Windows Terminal to see the role icons. For a compact display, l
 - [Choosing a model](#choosing-a-model)
 - [Everyday use](#everyday-use)
 - [Package deployments](#package-deployments)
+- [Atlas database](#atlas-database)
 - [Public web research](#public-web-research)
 - [Your notes](#your-notes)
 - [Thinking mode](#thinking-mode)
@@ -31,6 +32,7 @@ On Windows, use Windows Terminal to see the role icons. For a compact display, l
 - chat, answer questions, explain and write, like any assistant
 - check this PC and other PCs by name: online status, uptime, disks, services, processes, logged-on users, event logs
 - look up users, computers and groups in Active Directory (read-only)
+- search a local Atlas database for people, PCs and stored assignment links (read-only)
 - start and stop services, end stuck processes and restart PCs, after asking you
 - find packages and install, uninstall, repair or copy them to selected PCs, with persistent jobs and logs
 - search the public web, read pages and follow source links
@@ -39,7 +41,7 @@ On Windows, use Windows Terminal to see the role icons. For a compact display, l
 
 **It doesn't:**
 
-- need Atlas installed or running, or read the Atlas database. Give Axis an explicit PC name or ask for an Active Directory lookup.
+- need Atlas installed or running. Its optional directory connector reads an existing database file directly.
 - treat an installer's exit code as proof the application works. Application health needs a separate check.
 - sign into websites or submit forms; JavaScript pages and PDFs require Firecrawl.
 
@@ -65,6 +67,20 @@ When a full supported GGUF is present, Axis uses it directly. For model parts, i
 ![Starting Axis: choosing a model, loading it, and the first questions](images/01-start.png)
 
 If you've downloaded more than one model, Axis asks which one to use. Press Enter for the first one.
+
+## Atlas database
+
+To let Axis find people and their PCs, put your Atlas `office_atlas.db` beside **Start Agent.bat**. You can also point it at the existing file:
+
+```bat
+"Start Agent.bat" --atlas-db "F:\Atlas\DB\office_atlas.db"
+```
+
+With no explicit setting, Axis checks beside the agent, its `data` subfolder and `F:\Atlas\DB\office_atlas.db` on Windows. One matching file is selected automatically; multiple matches require an explicit path. `AGENT_ATLAS_DB` or `ATLAS_DB_PATH` can also supply the path. Type `/status` to see the selected database; no database is downloaded or created automatically.
+
+Try “Find Marie's PCs in Atlas”, “Look up someone@example.com in Atlas”, or “Who is assigned PC-123 in the inventory?” Searches return record IDs, and Axis can read their stored links. It asks when a name or PC choice is ambiguous. Assignment and the inventory's last recorded logon are labelled separately; live online/session checks still use the Windows tools.
+
+The connection is read-only and uses Python's built-in SQLite support. Atlas does not need to run, and the full database is not loaded into the model. This connector reads the main people/computer inventory, including source/import dates where available; separate VDI tables, maps, package metadata and Knowledge Base articles are not included. Use a current Atlas backup/export when copying a database that Atlas is updating. The public ZIP contains no database, so preserve yours when updating Axis.
 
 ## Choosing a model
 
@@ -204,6 +220,7 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | `--temperature`, `--top-p` | Override the model's sampling defaults. |
 | `--workdir FOLDER` | The folder Axis may read and write files in. Default: `workspace` next to `start.py`. |
 | `--notes FOLDER` | Use a different notes folder. |
+| `--atlas-db PATH` | Read people and computer inventory from this existing Atlas database. |
 | `--package-repo PATH` | Override the preconfigured package repository. |
 | `--state-dir FOLDER` | Store persistent jobs and saved tool output in a different folder. |
 | `--yes` | Approve every change without asking. Not recommended on work PCs. |

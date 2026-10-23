@@ -32,7 +32,7 @@ In a synthetic Linux rendering check, 10,000 five-character fragments required 5
 
 Saved job/output IDs accept an unambiguous prefix of at least six characters. Ctrl+C cancels the current request and returns to the prompt; it does not terminate the model server or cancel accepted background jobs. Interrupted actions can have unknown outcomes, so inspect their state before retrying. Input during `/paste` is discarded if cancelled. Incomplete/truncated model tool calls are not executed.
 
-Keep `terminal_ui.py` and `web_tools.py` next to `agent.py`; setup and the Windows bundle include them.
+Keep `terminal_ui.py`, `web_tools.py` and `atlas_db.py` next to `agent.py`; setup and the Windows bundle include them.
 
 ## Public web search and reading
 
@@ -54,7 +54,7 @@ The basic fallback reads public HTML/text only. Neither provider signs into webs
 
 ## Standalone Windows IT actions
 
-Keep `agent.py`, `it_tools.py`, `it_windows.ps1`, `terminal_ui.py` and `web_tools.py` together. Both setup and the Windows bundle include them. To update an existing bundle, replace these files plus `start.py`; keep your models, notes and `state` folder.
+Keep `agent.py`, `it_tools.py`, `it_windows.ps1`, `terminal_ui.py`, `web_tools.py` and `atlas_db.py` together. Both setup and the Windows bundle include them. To update an existing bundle, replace these files plus `start.py`; keep your models, notes, database and `state` folder.
 
 Start normally; the pictured OneDrive package repository is already the default:
 
@@ -101,6 +101,20 @@ Packages stage under `C:\Temp\LocalAgent\Packages` on each target; each attempt 
 Deployment/reboot workers run separately from the chat, so closing the chat does not cancel remote work. Job records and full tool output live in `state` next to the agent (override with `--state-dir`). If the worker/PC stops unexpectedly, inspect `it_job_status` and the target before retrying. Unknown jobs reserve their targets until you explicitly acknowledge inspection. No automatic reboot or remote installer cancellation is performed.
 
 Service and process changes use recent snapshots bound to the selected PC; the backend re-reads identity before acting and checks the final state. Critical services/processes are protected. Software inventory reads machine-wide uninstall registry entries, not `Win32_Product`; user registrations and MSIX/Appx packages are not included. Uninstall/repair uses your repository's corresponding script, not guessed vendor switches. Existing `run_command` remains available for operations outside these named tools.
+
+## Read-only Atlas database
+
+Axis can query the people and computer inventory in an existing Atlas `office_atlas.db` using Python's built-in SQLite support. Atlas need not be running. It exposes two small tools: `search_atlas` searches names, accounts, email addresses and PCs; `read_atlas_record` reads a returned record ID and its linked people/devices. Searches and linked records are paginated. The current connector covers the main `users`, `machines` and `assignments` tables; separate VDI inventory, maps, package metadata and the Knowledge Base database are outside this connector's scope.
+
+Set `--atlas-db PATH`, `AGENT_ATLAS_DB`, or `ATLAS_DB_PATH` (in that order). With no explicit path, Axis looks for `office_atlas.db` beside `agent.py`, in its `data` folder, or at `F:\Atlas\DB\office_atlas.db` on Windows. It uses a single existing match; multiple matches require `--atlas-db`. Missing files are never created, and an invalid explicit path never silently selects a different database. `/status` shows the selected path. Query tools are omitted when no database is found.
+
+```bat
+"Start Agent.bat" --atlas-db "F:\Atlas\DB\office_atlas.db"
+```
+
+Ask “Find Marie's PCs in Atlas” or “Who is assigned PC-123 in the inventory?” Ambiguous people and device choices remain explicit. Assignment and last logged-on inventory links are labelled separately. These records do not prove that a PC is online or a person is currently signed in; live checks still use the Windows tools. Results show the source and directory import date when stored in the database.
+
+Connections use SQLite `mode=ro` and `query_only`, fixed parameterized lookups and bounded results. No Atlas API, database migration, third-party package or background indexer is used. Each lookup reads a consistent snapshot, including committed WAL changes; repeated identical lookups within one request are reused only while the database/WAL file fingerprints are unchanged. Database records stay local. No database is included in the public ZIP. Use an Atlas backup/export when copying a database that Atlas is updating; copying only the main file can omit committed WAL data.
 
 ## Offline bundle (Windows, browser downloads only)
 
@@ -163,6 +177,7 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--no-think` | off | Disable thinking for faster answers |
 | `--temperature`, `--top-p` | 0.6 and 0.95 with thinking; 0.3 and 0.9 without | Sampling overrides; the launcher uses model-specific defaults when present |
 | `--no-web` | off | Disable public web search and page reading |
+| `--atlas-db` | automatic local detection | Read-only Atlas inventory file; overrides `AGENT_ATLAS_DB` / `ATLAS_DB_PATH` |
 | `--package-repo` | OneDrive BetaPackages folder above; environment variables override | Root containing deployable package folders |
 | `--state-dir` | `state` next to agent.py | Durable jobs, snapshots and full tool results |
 | `--max-steps` | `30` | Maximum model/tool rounds per request (1–200) |

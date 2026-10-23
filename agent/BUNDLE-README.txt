@@ -6,9 +6,21 @@ https://github.com/AOSPAndroid/Axis/blob/main/docs/GUIDE.md
 
 Contents: the agent, a launcher, and llama.cpp builds for the processor
 (llama-cpu) and for graphics cards (llama-vulkan). Models are separate.
-Keep agent.py, it_tools.py, it_windows.ps1, terminal_ui.py and web_tools.py
+Keep agent.py, it_tools.py, it_windows.ps1, terminal_ui.py, web_tools.py and atlas_db.py
 together.
 Atlas is not needed.
+
+Optional Atlas database: place office_atlas.db beside Start Agent.bat, or run:
+  "Start Agent.bat" --atlas-db "F:\Atlas\DB\office_atlas.db"
+The F:\Atlas\DB location and this folder's data\office_atlas.db are also detected
+when there is exactly one match. --atlas-db, AGENT_ATLAS_DB and ATLAS_DB_PATH
+override detection, in that order. /status shows the chosen path.
+Axis can find people and PCs and read their stored assignment links without
+Atlas running. Reads use SQLite's read-only mode; no records are edited.
+Inventory records are not live online/logon status. Separate VDI tables, maps,
+package metadata and the Knowledge Base database are not queried.
+Use an Atlas backup/export if copying a database that Atlas is updating.
+The ZIP contains no private database; keep your database when updating Axis.
 
 The terminal opens with the AXIS ASCII logo and shows the model/workspace,
 readable tool activity and job tables. Responses are labelled AXIS.
