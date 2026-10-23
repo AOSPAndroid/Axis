@@ -746,6 +746,13 @@ class TerminalUI:
                     self._line(value if isinstance(value, str) else json.dumps(value, ensure_ascii=False), prefix="    ")
                 if not self.verbose and len(values) > 10:
                     self._line("... %d more" % (len(values) - 10), "dim", prefix="    ")
+        if data.get("package") and "scripts" in data:
+            self._line("%s scripts for %s" % (data.get("action", "Install"), data["package"]), "dim", prefix="  ")
+            next_script = data.get("script_next_offset", data.get("next_offset"))
+            if next_script is not None:
+                self._line("More scripts: find_packages with this package, action and offset %s." % next_script, "dim", prefix="  ")
+        elif "packages" in data and data.get("next_offset") is not None:
+            self._line("More packages: find_packages with offset %s." % data["next_offset"], "dim", prefix="  ")
         if data.get("scope"):
             self._line(data["scope"], "dim", prefix="  ")
         for warning in data.get("warnings", []) if isinstance(data.get("warnings"), list) else []:

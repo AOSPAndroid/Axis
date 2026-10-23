@@ -60,6 +60,81 @@ class ITTests(unittest.TestCase):
             with self.subTest(script=script), self.assertRaises(ValueError):
                 self.backend.selection(self.package.name, script, "Install")
 
+    def test_unique_package_search_returns_action_scripts_ready_for_selection(self):
+        (self.package / "app_r.ps1").write_text("exit 0\n")
+        for action, script in (("Install", "app_i.ps1"), ("Uninstall", "app_u.vbs"), ("Repair", "app_r.ps1")):
+            with self.subTest(action=action):
+                result = self.backend.find_packages(query="EXAMPLE", action=action)
+                self.assertEqual(result["packages"], [self.package.name])
+                self.assertEqual(result["total"], 1)
+                self.assertIsNone(result["next_offset"])
+                self.assertEqual(result["package"], self.package.name)
+                self.assertEqual(result["action"], action)
+                self.assertEqual(result["scripts"], [script])
+                self.assertEqual(result["script_total"], 1)
+                self.assertIsNone(result["script_next_offset"])
+                # The combined result is sufficient for the existing deployment validator.
+                folder, selected, checksum = self.backend.selection(result["package"], result["scripts"][0], result["action"])
+                self.assertEqual(folder, self.package.resolve())
+                self.assertEqual(selected, script)
+                self.assertEqual(checksum, it.digest(self.package / script))
+
+    def test_ambiguous_package_pages_do_not_scan_or_choose_a_package(self):
+        for index in range(51):
+            (self.repo / ("Example extra %02d" % index)).mkdir()
+        with patch.object(self.backend, "scripts") as scripts:
+            first = self.backend.find_packages(query="Example")
+            second = self.backend.find_packages(query="Example", offset=first["next_offset"])
+        scripts.assert_not_called()
+        self.assertEqual(first["total"], 52)
+        self.assertEqual(len(first["packages"]), 50)
+        self.assertEqual(len(second["packages"]), 2)
+        self.assertEqual(len(set(first["packages"] + second["packages"])), 52)
+        self.assertIsNone(second["next_offset"])
+        for result in (first, second):
+            self.assertNotIn("package", result)
+            self.assertNotIn("scripts", result)
+
+    def test_unique_package_script_pagination_is_separate_from_package_pagination(self):
+        for index in range(55):
+            (self.package / ("extra_%02d_i.ps1" % index)).write_text("exit 0\n")
+        result = self.backend.find_packages(query="Example")
+        self.assertEqual(result["total"], 1)
+        self.assertIsNone(result["next_offset"])
+        self.assertEqual(result["script_total"], 56)
+        self.assertEqual(len(result["scripts"]), 50)
+        self.assertEqual(result["script_next_offset"], 50)
+        rest = self.backend.find_packages(package=result["package"], action=result["action"], offset=result["script_next_offset"])
+        self.assertEqual(rest["total"], 56)
+        self.assertIsNone(rest["next_offset"])
+        self.assertEqual(result["scripts"] + rest["scripts"], self.backend.scripts(self.package.resolve(), "Install"))
+
+    def test_no_match_or_past_last_package_page_has_no_phantom_selection(self):
+        with patch.object(self.backend, "scripts") as scripts:
+            missing = self.backend.find_packages(query="missing")
+            beyond = self.backend.find_packages(query="Example", offset=1)
+        scripts.assert_not_called()
+        self.assertEqual(missing["total"], 0)
+        self.assertEqual(beyond["total"], 1)
+        for result in (missing, beyond):
+            self.assertEqual(result["packages"], [])
+            self.assertNotIn("package", result)
+            self.assertNotIn("scripts", result)
+
+    def test_unique_package_lookup_retains_existing_validation(self):
+        with self.assertRaisesRegex(ValueError, "Choose Install"):
+            self.backend.find_packages(query="Example", action="Delete")
+        with self.assertRaisesRegex(ValueError, "missing"):
+            self.backend.find_packages(package="Missing")
+        original = it.linked
+        with patch.object(it, "linked", side_effect=lambda path: path.name == "app_i.ps1" or original(path)):
+            with self.assertRaisesRegex(ValueError, "symlink/junction"):
+                self.backend.find_packages(query="Example")
+        # Revalidate after discovery: the selected folder may have disappeared.
+        with patch.object(self.backend, "package", side_effect=ValueError("Package missing")):
+            with self.assertRaisesRegex(ValueError, "Package missing"):
+                self.backend.find_packages(query="Example")
+
     def test_linked_package_content_is_rejected(self):
         outside = self.root / "outside.ps1"
         outside.write_text("exit 0")
@@ -93,6 +168,26 @@ class ITTests(unittest.TestCase):
         self.assertEqual(spawn.call_args.args[0]["computers"], ["PC-1", "PC-2"])
         self.assertIn("PC-1, PC-2", self.confirm.call_args.args[0])
         self.assertIn("SHA256=", self.confirm.call_args.args[0])
+
+    def test_queued_deployment_returns_a_saved_job_link_without_waiting_or_claiming_success(self):
+        with patch.object(it.subprocess, "Popen") as worker, \
+             patch.object(self.backend, "ps") as ps, \
+             patch.object(self.backend, "it_job_status") as status:
+            result = self.backend.deploy_package(["PC-1"], self.package.name, "app_i.ps1", "Install")
+        worker.assert_called_once()
+        ps.assert_not_called()
+        status.assert_not_called()
+        self.confirm.assert_called_once()
+        job = it.read_json(self.backend.state / "jobs" / (result["job_id"] + ".json"))
+        self.assertEqual(result["state"], "queued")
+        self.assertEqual(job["state"], "queued")
+        self.assertEqual(job["results"], [])
+        self.assertEqual(job["script_sha256"], it.digest(self.package / "app_i.ps1"))
+        self.assertEqual(result["computers"], ["PC-1"])
+        self.assertIn("/jobs " + job["id"], result["message"])
+        self.assertIn("not yet verified", result["message"])
+        self.assertNotIn("verified", result)
+        self.assertNotIn("application_verified", result)
 
     def test_snapshot_is_bound_to_target_view_and_lifetime(self):
         self.backend.ps = Mock(return_value={"ok": True, "computer": "PC-1", "items": [{"Name": "Spooler"}]})

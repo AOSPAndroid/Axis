@@ -136,13 +136,13 @@ Structured inspection and directory tools run without approval and show compact 
 
 By default, changes show an `APPROVAL REQUIRED` panel with the action and targets. Type `y` at `Allow this action? [y/N]` to run it or press Enter to refuse. That covers deployments, starting or stopping services, ending processes, restarting PCs, writing files and running scripts. `--yes` automatically approves these actions.
 
-Axis follows the same routine for every fix: it reads the current state, says what it will change and why, asks you, then reads the state again to confirm the result.
+Axis uses current evidence, briefly describes a change and asks through the tool's approval prompt. Structured tools perform their own checks: deployment workers check connectivity and permissions, and service/process actions verify their outcome. Axis uses those results without repeating the same inspection; missing or uncertain results need further checking.
 
 ![Axis fixing a stopped Print Spooler: it checks first, asks before the change, then verifies](images/03-approval.png)
 
 Good to know:
 
-- Structured reboot actions create a monitored job. Axis reports the queued job ID and returns to chat unless you asked it to wait or verify; `/jobs ID` reports progress and boot-time verification. Queued does not mean the reboot has completed.
+- Deployments and reboots create background jobs. Axis reports the queued job ID and returns to chat unless you asked it to wait or verify; `/jobs ID` reports progress without using the model. Queued does not mean completed, and installer exit 0 does not prove the application works.
 - Deployment results distinguish script exit 0, restart-required codes 3010/1641, failures and unknown outcomes. Script completion does not verify application health.
 - Structured service/process tools enforce protected targets and recheck identity against a recent inspection. General shell commands run with your Windows account's rights.
 - Ctrl+C cancels the current chat request. Accepted background deployment/reboot jobs continue; inspect their status before retrying an uncertain operation.
@@ -177,7 +177,7 @@ Axis reuses repeated note/package lookups within a request and stops a continuin
 
 Axis discovers packages from the preconfigured repository and performs install, uninstall, repair, copy-only or execute-existing workflows. Atlas is not required. `/status` shows the repository; `--package-repo PATH` overrides it.
 
-Ask Axis to find the package, then give it the exact target PC names and desired action. It shows an approval before starting. An accepted job ID means queued; `/jobs` tracks each target and `/output` exposes full logs and results. Jobs persist in the `state` folder next to the agent.
+Ask Axis to find the package, then give it the exact target PC names and desired action. A single matching package includes its action scripts in one lookup; several versions still require a choice. It shows an approval before starting. An accepted job ID means queued; `/jobs` tracks each target and `/output` exposes full logs and results. Jobs persist in the `state` folder next to the agent.
 
 If monitoring is lost, the result is `unknown`. Inspect the target and logs before retrying. A successful installer exit still needs an application or vendor-specific health check.
 

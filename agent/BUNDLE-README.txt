@@ -165,7 +165,8 @@ WMI/file sharing and your Windows account's rights must permit the operation;
 AD lookup needs RSAT. The default context is 16384 tokens; --ctx 8192 reduces it.
 
 Ask for package discovery and a copy-only test before your first deployment.
-A job ID means queued; ask for its status and each PC's result. Script exit 0
+A job ID means queued. Axis returns to chat unless you asked it to wait or
+verify; /jobs ID checks progress without using the model. Script exit 0
 does not verify application health. Unknown outcomes must be inspected before
 retrying. Jobs run separately from chat and continue when the chat closes.
 State, snapshots and full tool results are kept in the state folder; preserve

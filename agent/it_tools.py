@@ -31,17 +31,17 @@ TOOLS = [
         "computer": STRING, "view": {"type": "string", "enum": ["preflight", "overview", "disks", "services", "processes", "software"]},
         "query": STRING, "offset": {"type": "integer", "minimum": 0},
         "limit": {"type": "integer", "minimum": 1, "maximum": 100}}, ["computer", "view"]),
-    tool("find_packages", "Search the configured package repository. Supply an exact package to discover its Install/Uninstall/Repair scripts. Never guess a package or script.", {
+    tool("find_packages", "Search the configured package repository. A single match includes its action-specific scripts; reuse them without another lookup. Multiple matches require choosing an exact package. Supply package and offset for more script pages. Never guess a package or script.", {
         "query": STRING, "package": STRING,
         "action": {"type": "string", "enum": ["Install", "Uninstall", "Repair"]},
         "offset": {"type": "integer", "minimum": 0}}, []),
-    tool("deploy_package", "Approve and start a durable deployment to explicit PC names. Discover package/script first. Copies with Robocopy, launches via WMI and records exit code/log. Returns a job ID, NOT installation success; check it_job_status. Supports multiple PCs, processed in order. Never automatically retry an unknown outcome.", {
+    tool("deploy_package", "Approve and start a durable deployment to explicit PC names. Discover package/script first. The worker checks WMI/admin-share access, copies with Robocopy, launches via WMI and records exit code/log. Returns a queued job, NOT installation success. Report the job and /jobs ID; wait or verify only when requested. Supports multiple PCs, processed in order. Never automatically retry an unknown outcome.", {
         "computers": {"type": "array", "items": STRING, "minItems": 1, "maxItems": 200},
         "package": STRING, "script": STRING,
         "action": {"type": "string", "enum": ["Install", "Uninstall", "Repair"]},
         "mode": {"type": "string", "enum": ["full", "copy", "execute"]}},
          ["computers", "package", "script", "action"]),
-    tool("it_job_status", "List saved deployments/reboots, or read a job's per-PC outcomes and logs. wait_seconds waits up to 10 seconds. Unknown means inspect the PC before retrying. acknowledge_unknown only releases an unknown job's target after the operator confirms inspection; it never retries or stops remote work.", {
+    tool("it_job_status", "List saved deployments/reboots, or read a job's per-PC outcomes and logs. When the user asks to wait, use wait_seconds=10 for a bounded wait instead of immediate repeated polls. Unknown means inspect the PC before retrying. acknowledge_unknown only releases an unknown job's target after the operator confirms inspection; it never retries or stops remote work.", {
         "job_id": STRING, "wait_seconds": {"type": "integer", "minimum": 0, "maximum": 10},
         "acknowledge_unknown": {"type": "boolean"}}, []),
     tool("computer_action", "Change a Windows PC after approval. For service_start/stop/restart use name and the services snapshot ID; for process_stop use pid and the processes snapshot ID. Re-reads identity and verifies the outcome. enable_remote_registry explicitly enables/starts RemoteRegistry. reboot returns a monitored job. cleanup_packages deletes only this agent's staging folder.", {
@@ -302,8 +302,14 @@ class ITTools:
             raise ValueError("Invalid query")
         packages = sorted((p.name for p in self.root().iterdir()
                            if p.is_dir() and not linked(p) and query.casefold() in p.name.casefold()), key=str.casefold)
-        return {"repository": str(self.root()), "packages": packages[offset:offset + 50], "total": len(packages),
-                "next_offset": offset + 50 if len(packages) > offset + 50 else None}
+        result = {"repository": str(self.root()), "packages": packages[offset:offset + 50], "total": len(packages),
+                  "next_offset": offset + 50 if len(packages) > offset + 50 else None}
+        if len(packages) == 1 and offset == 0:
+            folder = self.package(packages[0])
+            scripts = self.scripts(folder, action)
+            result.update(package=folder.name, action=action, scripts=scripts[:50], script_total=len(scripts),
+                          script_next_offset=50 if len(scripts) > 50 else None)
+        return result
 
     def selection(self, package, script, action):
         folder = self.package(package)
@@ -347,7 +353,7 @@ class ITTools:
             raise
         message = ("Reboot queued; completion is not yet verified. Progress and boot-time verification: /jobs %s." % job_id
                    if job["kind"] == "reboot" else
-                   "Accepted for background processing. Call it_job_status; this is not installation success.")
+                   "Deployment queued; installation is not yet verified. Progress: /jobs %s." % job_id)
         return {"job_id": job_id, "state": "queued", "computers": job["computers"], "message": message}
 
     def deploy_package(self, computers, package, script, action, mode="full"):

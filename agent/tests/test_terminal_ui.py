@@ -37,6 +37,29 @@ class AsciiStream(io.StringIO):
 
 
 class TerminalUITests(unittest.TestCase):
+    def test_package_results_keep_script_and_package_pagination_distinct(self):
+        cases = [
+            ({"packages": ["App 1"], "total": 1, "next_offset": None,
+              "package": "App 1", "action": "Uninstall", "scripts": ["app_u.ps1"],
+              "script_total": 51, "script_next_offset": 50}, "More scripts", "More packages"),
+            ({"package": "App 1", "action": "Uninstall", "scripts": ["app_u.ps1"],
+              "total": 51, "next_offset": 50}, "More scripts", "More packages"),
+            ({"packages": ["App 1", "App 2"], "total": 51, "next_offset": 50},
+             "More packages", "More scripts"),
+        ]
+        for data, expected, absent in cases:
+            with self.subTest(data=data):
+                stream = io.StringIO()
+                ui = TerminalUI(stream=stream, plain=True, width=120)
+                ui.tool_result("find_packages", json.dumps(data), 0)
+                text = stream.getvalue()
+                self.assertIn(expected, text)
+                self.assertNotIn(absent, text)
+                self.assertIn("offset 50", text)
+                if "scripts" in data:
+                    self.assertIn("app_u.ps1", text)
+                    self.assertIn("Uninstall scripts for App 1", text)
+
     def test_roles_have_distinct_body_colours_and_readable_icon_headings(self):
         stream = UTF8TTYStream()
         with patch.dict(os.environ, {"WT_SESSION": "test"}, clear=True), patch("terminal_ui._enable_vt", return_value=True):

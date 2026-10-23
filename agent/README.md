@@ -86,7 +86,7 @@ The model gets these tools:
 | Tool | What it does |
 | --- | --- |
 | `inspect_computer` | Preflight, OS/user/memory, disks, services, processes and machine-wide software registrations; paginated results. |
-| `find_packages` | Search package folders and discover `.ps1`/`.vbs` scripts ending in `_i`/`_install`/`_installs`, `_u`/`_uninstall`/`_uninstalls`, or `_r`/`_repair`/`_repairs`. |
+| `find_packages` | Search package folders and discover `.ps1`/`.vbs` scripts ending in `_i`/`_install`/`_installs`, `_u`/`_uninstall`/`_uninstalls`, or `_r`/`_repair`/`_repairs`. A unique search match includes its action scripts in the same result; multiple matches still need a choice. |
 | `deploy_package` | Install, uninstall or repair through the selected package script; full, copy-only or execute-existing modes; up to 200 explicit PCs, processed in order. |
 | `it_job_status` | Saved per-PC outcomes, exit codes and logs, with bounded waits; inspect unknown outcomes before releasing a target for another attempt. |
 | `computer_action` | Verified service start/stop/restart, checked process termination, explicit RemoteRegistry enable/start, monitored reboot, and cleanup of this agent's package staging only. |
@@ -98,7 +98,7 @@ Deployment uses your Windows identity, SMB administrative shares, Robocopy and W
 
 Packages stage under `C:\Temp\LocalAgent\Packages` on each target; each attempt owns a unique log/exit record under `C:\Temp\LocalAgent\Jobs`. The approved installer checksum is rechecked before launch. Robocopy codes 0–7 mean successful copying; 8+ fail. A job ID means queued. `script_succeeded` means the script returned 0, **not** that the application is healthy; `reboot_required` reports script exit 3010/1641 and still requires checking the application/vendor log. Missing exit records or lost monitoring produce `unknown`, never success or an automatic retry.
 
-Deployment/reboot workers run separately from the chat, so closing the chat does not cancel remote work. Job records and full tool output live in `state` next to the agent (override with `--state-dir`). If the worker/PC stops unexpectedly, inspect `it_job_status` and the target before retrying. Unknown jobs reserve their targets until you explicitly acknowledge inspection. No automatic reboot or remote installer cancellation is performed.
+Deployment/reboot workers run separately from the chat, so closing the chat does not cancel remote work. Axis reports the queued job and returns to chat unless you asked it to wait or verify; `/jobs ID` checks progress without using the model. Job records and full tool output live in `state` next to the agent (override with `--state-dir`). If the worker/PC stops unexpectedly, inspect `it_job_status` and the target before retrying. Unknown jobs reserve their targets until you explicitly acknowledge inspection. No automatic reboot or remote installer cancellation is performed.
 
 Service and process changes use recent snapshots bound to the selected PC; the backend re-reads identity before acting and checks the final state. Critical services/processes are protected. Software inventory reads machine-wide uninstall registry entries, not `Win32_Product`; user registrations and MSIX/Appx packages are not included. Uninstall/repair uses your repository's corresponding script, not guessed vendor switches. Existing `run_command` remains available for operations outside these named tools.
 
