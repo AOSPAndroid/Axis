@@ -52,7 +52,7 @@ def fixture(path):
 class AtlasDatabaseTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.path = self.root / "office_atlas.db"
         fixture(self.path)
         self.db = AtlasDatabase(self.path)
