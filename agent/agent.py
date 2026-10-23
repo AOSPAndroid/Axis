@@ -845,7 +845,8 @@ dim, cyan, yellow = _color("2"), _color("36"), _color("33")
 
 def show_banner(agent, ui):
     ui.banner(model=agent.last_model or agent.model, workdir=agent.workdir, ctx=agent.ctx,
-              thinking=agent.think, auto_approve=agent.auto_approve, package_repo=str(agent.it.repository))
+              thinking=agent.think, auto_approve=agent.auto_approve, package_repo=str(agent.it.repository),
+              web=agent.web.status if agent.web is not None else "disabled (--no-web)")
 
 
 def saved_id(agent, folder, prefix=None):

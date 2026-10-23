@@ -16,6 +16,8 @@ import time
 import urllib.error
 import urllib.request
 
+from terminal_ui import TerminalUI
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 PART_SIZE = 1900000000
 RELEASES = "https://github.com/AOSPAndroid/Axis/releases/tag/"
@@ -293,7 +295,8 @@ def server_ready():
         return False
 
 
-def start_server(exe, model, ctx, gpu, think=True, alias=None, extra=()):
+def start_server(exe, model, ctx, gpu, think=True, alias=None, extra=(), ui=None):
+    ui = ui or TerminalUI()
     log_path = os.path.join(HERE, "server.log")
     cmd = [exe, "-m", model, "-c", str(ctx), "--jinja", "--host", "127.0.0.1", "--port", str(PORT),
            # On a graphics card llama.cpp fits as many layers (or, for mixture-of-experts
@@ -313,23 +316,35 @@ def start_server(exe, model, ctx, gpu, think=True, alias=None, extra=()):
         except OSError as e:
             log("  could not start %s: %s" % (exe, e))
             return None
-    deadline = time.time() + 600
-    while time.time() < deadline:
-        if proc.poll() is not None:
-            with open(log_path, errors="replace") as f:
-                tail = f.read().splitlines()[-8:]
-            log("  llama-server stopped (exit code %s):" % proc.returncode)
-            for line in tail:
-                log("    " + line)
-            return None
-        if server_ready():
-            log("  ready.")
-            return proc
-        print(".", end="", flush=True)
-        time.sleep(2)
-    proc.kill()
-    log("  timed out after 10 minutes; see %s" % log_path)
-    return None
+    deadline = time.monotonic() + 600
+    try:
+        # llama-server does not provide reliable load percentages; show activity only.
+        with ui.status("Loading model"):
+            while time.monotonic() < deadline:
+                if proc.poll() is not None:
+                    with open(log_path, errors="replace") as f:
+                        tail = f.read().splitlines()[-8:]
+                    ui.error("llama-server stopped (exit code %s)" % proc.returncode)
+                    for line in tail:
+                        log("    " + line)
+                    return None
+                if server_ready():
+                    ui.checkpoint("Model ready")
+                    return proc
+                time.sleep(2)
+        proc.kill()
+        proc.wait()
+        ui.error("Timed out after 10 minutes; see %s" % log_path)
+        return None
+    except BaseException:
+        # Ctrl+C during model loading must not leave an orphan server behind.
+        proc.terminate()
+        try:
+            proc.wait(10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+        raise
 
 
 def wait_for_agent(command):
@@ -355,6 +370,7 @@ def server_model():
 def main(argv=None):
     p = argparse.ArgumentParser(description="Start llama-server and Axis.")
     p.add_argument("--setup-firecrawl", action="store_true", help="save a Firecrawl API key in your user profile, then exit")
+    p.add_argument("--plain", action="store_true", help="disable colour and animation in both startup and chat")
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
                    help="folder the agent works in (default: the workspace folder here)")
     p.add_argument("--ctx", type=int, help="context size in tokens (default: model setting, otherwise 16384)")
@@ -375,6 +391,10 @@ def main(argv=None):
         from web_tools import configure_firecrawl
         return configure_firecrawl()
 
+    ui = TerminalUI(plain=a.plain)
+    if a.plain:
+        agent_args.append("--plain")
+
     key, model = prepare_model(a.model)
     settings = MODELS[key]
     alias = settings["name"]
@@ -385,6 +405,7 @@ def main(argv=None):
         if value is not None:
             agent_args += [option, str(value)]
     log("Model: %s" % os.path.basename(model))
+    ui.startup(alias)
     os.makedirs(a.workdir, exist_ok=True)
 
     proc = None
@@ -406,7 +427,7 @@ def main(argv=None):
             where = "graphics card + processor" if build == "vulkan" else "processor"
             log("Starting llama-server (%s), loading the model" % where)
             proc = start_server(exe, model, ctx, build == "vulkan", think=a.think, alias=alias,
-                                extra=settings.get("server_args", ()))
+                                extra=settings.get("server_args", ()), ui=ui)
             if proc:
                 break
             if build == "vulkan":
@@ -429,4 +450,8 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print("\nStartup cancelled.")
+        sys.exit(130)

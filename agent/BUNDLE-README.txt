@@ -18,7 +18,16 @@ Narrow terminals and --plain use a compact AXIS heading.
 multiline request (finish with a single . line). Ctrl+C cancels the current
 request and returns to the prompt. /exit closes the chat. Accepted background
 IT jobs continue. Thinking is enabled and shown by default. --plain disables
-colour/animation; --verbose expands tool output. NO_COLOR is also supported.
+colour/animation in startup and chat; --verbose expands tool output.
+Run "Start Agent.bat --plain" for the compact display. NO_COLOR, TERM=dumb
+and redirected output also disable colour and animation.
+
+The ASCII interface uses only Python's standard library. Activity indicators
+animate at eight frames per second and stop before input or approval prompts.
+Streamed text is batched for up to about 125 ms between display updates.
+The startup logo reveal takes about 150 ms. Loading shows elapsed time, not
+an estimated percentage. Job logs show recorded events; /jobs ID refreshes
+background progress. Your terminal theme controls the background colour.
 
 Public web search and page reading are available by default. For example:
   Search Microsoft's documentation for installer exit code 3010 and cite it.

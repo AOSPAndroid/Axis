@@ -2,7 +2,13 @@
 
 Axis is a local AI assistant for IT support. It runs an open model on your own PC through llama.cpp and talks to you in a terminal window. This guide covers installing it, choosing a model, using it day to day, and fixing common problems.
 
-The screenshots illustrate workflows in an earlier Axis console with scripted model replies and sample PC names, people and values. The current console uses an AXIS ASCII banner, labelled tools and deployment tables.
+The workflow screenshots use scripted model replies and sample PC names, people and values. This preview shows the current ASCII interface using the actual renderer and scripted web results; later workflow images show an earlier console.
+
+![Current Axis ASCII interface](images/06-ascii-ui.png)
+
+The startup logo reveals briefly, and an ASCII activity bar animates while the model loads or a request runs. Animations stop before input and approval prompts. Thinking and answers stream in short batches, with labelled tool results kept in normal scrollback. Loading indicators show elapsed time; deployment panels show recorded events and refresh with `/jobs ID`. Colours follow your terminal capabilities and background theme.
+
+For a compact display, launch `Start Agent.bat --plain`. This disables the logo, colour and motion in startup and chat. `NO_COLOR`, `TERM=dumb` and redirected output also disable colour and motion. The interface adds no third-party Python dependencies.
 
 - [What Axis can and can't do](#what-axis-can-and-cant-do)
 - [What you need](#what-you-need)
@@ -189,7 +195,7 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | `--think` | Enable and show model reasoning. This is the default. |
 | `--no-think` | Disable thinking for faster answers. |
 | `--verbose` | Expand tool results; thinking is already shown by default. |
-| `--plain` | Use compact headings without the logo, colour or animation. `NO_COLOR` also disables colour. |
+| `--plain` | Use compact headings without the logo, colour or animation in startup and chat. `NO_COLOR` also disables colour and animation. |
 | `--no-web` | Disable public web search and page reads. |
 | `--cpu` | Use only the processor, even if a graphics card is found. |
 | `--gpu` | Try the graphics card even if it reports less than 4 GB. |

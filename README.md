@@ -6,7 +6,9 @@
 
 Axis has its own deployment, directory and machine inspection tools. **Atlas does not need to be installed or running.**
 
-![Axis fixing a stopped Print Spooler: it checks first, asks before the change, then verifies](docs/images/03-approval.png)
+![Axis ASCII interface showing public web research](docs/images/06-ascii-ui.png)
+
+Actual terminal renderer with scripted example data. Axis has an ASCII logo, coloured tool panels and animated activity indicators. The interface uses only Python's standard library; animations stop while you type. Run `Start Agent.bat --plain` for a compact display without colour or motion.
 
 ## Quick start
 
@@ -24,7 +26,7 @@ For Firecrawl web research, double-click **`Configure Firecrawl.bat`**, paste yo
 | --- | --- |
 | ![Axis checking a PC's uptime and disks without asking](docs/images/02-check.png) | ![Axis answering from the notes folder](docs/images/04-notes.png) |
 
-The screenshots illustrate workflows in an earlier Axis console with scripted replies and sample PC names, people and values. The current console adds the AXIS ASCII banner, labelled tools and deployment tables.
+The two workflow screenshots above show an earlier console with scripted replies and sample data. The screenshot at the top shows the current ASCII interface. Colours depend on your terminal theme.
 
 ## What Axis does
 

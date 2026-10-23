@@ -25,6 +25,10 @@ AXIS_LOGO = (
 
 _ANSI = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]|\x1b[@-_]", re.S)
 _TONES = {"accent": "36", "info": "36", "dim": "90", "warning": "33", "error": "31", "success": "32"}
+_RGB_TONES = {"accent": "38;2;96;223;255", "info": "38;2;96;223;255", "dim": "38;2;148;163;184",
+              "warning": "38;2;255;198;109", "error": "38;2;248;113;113", "success": "38;2;178;224;117"}
+FRAME_INTERVAL = 0.125  # Eight frames per second; no animation thread while idle.
+STREAM_BUFFER_LIMIT = 1024
 _TITLES = {"inspect_computer": "Inspect computer", "find_packages": "Find packages",
            "deploy_package": "Deploy package", "it_job_status": "Deployment status",
            "computer_action": "Computer action", "directory_lookup": "Directory lookup",
@@ -126,18 +130,20 @@ class TerminalUI:
         self.interactive = bool(getattr(self.stream, "isatty", lambda: False)())
         self._vt = _enable_vt(self.stream) if self.interactive else False
         self.color = self.interactive and self._vt and not self.plain and "NO_COLOR" not in os.environ and os.environ.get("TERM") != "dumb"
-        encoding = getattr(self.stream, "encoding", None) or "utf-8"
-        try:
-            "\u256d\u2500\u2502\u2026".encode(encoding)
-            self.unicode = not self.plain
-        except (UnicodeEncodeError, LookupError):
-            self.unicode = False
+        self.animated = self.color
+        self.unicode = False  # ASCII layout works in Windows Console and narrow/legacy terminals.
+        self._tones = _RGB_TONES if os.environ.get("WT_SESSION") or os.environ.get("COLORTERM") in ("truecolor", "24bit") else _TONES
         self._lock = threading.RLock()
         self._activity = None
         self._response_open = False
         self._thinking_open = False
         self._response_bold = False
         self._pending_star = ""
+        self._response_buffer = []
+        self._thinking_buffer = []
+        self._response_size = self._thinking_size = 0
+        self._response_flushed = self._thinking_flushed = 0
+        self._intro_shown = False
 
     @property
     def width(self):
@@ -151,7 +157,7 @@ class TerminalUI:
         if bold:
             codes.append("1")
         if tone:
-            codes.append(_TONES.get(tone, "36"))
+            codes.append(self._tones.get(tone, "36"))
         return ("\033[" + ";".join(codes) + "m" + text + "\033[0m") if codes else text
 
     def _raw(self, text):
@@ -169,11 +175,11 @@ class TerminalUI:
                 return
             self._activity = None
             active.stop.set()
-        if active.thread is not threading.current_thread():
+        if active.thread is not None and active.thread.ident is not None and active.thread is not threading.current_thread():
             active.thread.join()
         with self._lock:
             if active.length:
-                self._raw("\r" + " " * active.length + "\r")
+                self._raw("\r\033[2K")
 
     def _prepare(self, close_streams=True):
         self._stop_activity()
@@ -213,21 +219,45 @@ class TerminalUI:
                 self._raw(self._style(v, tone) + " " + line + " " * max(0, body_width - _width(line)) + " " + self._style(v, tone) + "\n")
         self._raw(self._style(bl + h * (self.width - 2) + br, tone) + "\n")
 
-    def banner(self, model, workdir, ctx, thinking, auto_approve, package_repo=None):
+    def _logo(self, reveal=False):
+        if self.plain or self.width < max(map(len, AXIS_LOGO)) + 4:
+            return
+        self._line()
+        for row in AXIS_LOGO:
+            self._line(row, "accent", prefix="  ", bold=True)
+            if reveal and self.animated and not self._intro_shown:
+                time.sleep(0.03)
+        self._intro_shown = True
+        self._line("LOCAL INTELLIGENCE. REAL ACTIONS.", "dim", prefix="  ")
+        self._line()
+
+    def startup(self, model):
         self._prepare()
         with self._lock:
-            if not self.plain and self.width >= max(map(len, AXIS_LOGO)) + 4:
-                self._line()
-                for row in AXIS_LOGO:
-                    self._line(row, "accent", prefix="  ", bold=True)
-                self._line()
-            details = [str(model), "Context %s  |  Thinking %s  |  Approval %s" % (
+            self._logo(reveal=True)
+            self._heading("AXIS / STARTUP")
+            self._line("MODEL  " + str(model), prefix="  ")
+            self._line("Ctrl+C cancels startup", "dim", prefix="  ")
+
+    def checkpoint(self, message):
+        self._prepare()
+        with self._lock:
+            self._line("[OK] " + str(message), "success", prefix="  ")
+
+    def banner(self, model, workdir, ctx, thinking, auto_approve, package_repo=None, web=None):
+        self._prepare()
+        with self._lock:
+            self._logo()
+            details = ["MODEL  " + str(model), "Context %s  |  Thinking %s  |  Approval %s" % (
                 format(ctx, ","), "on" if thinking else "off", "automatic (--yes)" if auto_approve else "ask before changes"),
                 "Workspace  " + str(workdir)]
+            if web:
+                details.append("WEB    " + str(web))
             if package_repo:
                 details.append("Packages   " + str(package_repo))
             self._box("AXIS", details)
             self._line("/help commands   /jobs deployments   /paste multiline", "dim")
+            self._line("Ctrl+C cancel request   /status settings   /exit quit", "dim")
 
     def notice(self, message, tone="info"):
         self._prepare()
@@ -278,7 +308,31 @@ class TerminalUI:
         self.write_response(text)
         self.end_response()
 
+    def _start_stream_flush(self):
+        if not self.animated:
+            return
+        activity = _Activity()
+
+        def flush():
+            while not activity.stop.wait(FRAME_INTERVAL):
+                with self._lock:
+                    if activity.stop.is_set():
+                        break
+                    self._flush_thinking()
+                    self._flush_response()
+
+        activity.thread = threading.Thread(target=flush, name="local-agent-stream", daemon=True)
+        self._activity = activity
+        try:
+            activity.thread.start()
+        except BaseException:
+            activity.stop.set()
+            self._activity = None
+            raise
+
     def begin_response(self):
+        if self._response_open:
+            return
         self._stop_activity()
         self.end_thinking()
         with self._lock:
@@ -288,83 +342,130 @@ class TerminalUI:
                 self._response_open = True
                 self._response_bold = False
                 self._pending_star = ""
+                self._start_stream_flush()
 
     def write_response(self, text):
         if not text:
             return
         self.begin_response()
         with self._lock:
-            value = self._pending_star + clean_text(text)
-            self._pending_star = ""
-            if value.endswith("*") and not value.endswith("**"):
-                value, self._pending_star = value[:-1], "*"
-            parts = value.split("**")
-            for i, part in enumerate(parts):
-                if i:
-                    self._response_bold = not self._response_bold
-                if part:
-                    self._raw(self._style(part, bold=self._response_bold))
+            self._response_buffer.append(text)
+            self._response_size += len(text)
+            if (not self.animated or self._response_size >= STREAM_BUFFER_LIMIT or
+                    time.monotonic() - self._response_flushed >= FRAME_INTERVAL):
+                self._flush_response()
+
+    def _flush_response(self):
+        if not self._response_buffer:
+            return
+        value = self._pending_star + clean_text("".join(self._response_buffer))
+        self._response_buffer.clear()
+        self._response_size = 0
+        self._response_flushed = time.monotonic()
+        self._pending_star = ""
+        if value.endswith("*") and not value.endswith("**"):
+            value, self._pending_star = value[:-1], "*"
+        output = []
+        for i, part in enumerate(value.split("**")):
+            if i:
+                self._response_bold = not self._response_bold
+            if part:
+                output.append(self._style(part, bold=self._response_bold))
+        if output:
+            self._raw("".join(output))
 
     def end_response(self):
         self._stop_activity()
         with self._lock:
             if self._response_open:
+                self._flush_response()
                 if self._pending_star:
                     self._raw(self._pending_star)
                 self._raw("\n")
                 self._response_open = False
                 self._response_bold = False
                 self._pending_star = ""
+                self._response_flushed = 0
 
     def begin_thinking(self):
         self._stop_activity()
         self.end_response()
         with self._lock:
             if not self._thinking_open:
-                self._raw(self._style("  Thinking\n", "dim"))
+                self._heading("Thinking / REASONING", tone="dim")
                 self._thinking_open = True
+                self._start_stream_flush()
 
     def write_thinking(self, text):
         if not self._thinking_open:
             self.begin_thinking()
         with self._lock:
-            self._raw(self._style(clean_text(text), "dim"))
+            self._thinking_buffer.append(text)
+            self._thinking_size += len(text)
+            if (not self.animated or self._thinking_size >= STREAM_BUFFER_LIMIT or
+                    time.monotonic() - self._thinking_flushed >= FRAME_INTERVAL):
+                self._flush_thinking()
+
+    def _flush_thinking(self):
+        if self._thinking_buffer:
+            self._raw(self._style(clean_text("".join(self._thinking_buffer)), "dim"))
+            self._thinking_buffer.clear()
+            self._thinking_size = 0
+            self._thinking_flushed = time.monotonic()
 
     def end_thinking(self):
         self._stop_activity()
         with self._lock:
             if self._thinking_open:
+                self._flush_thinking()
                 self._raw("\n")
                 self._thinking_open = False
+                self._thinking_flushed = 0
+
+    def _activity_frame(self, label, tick, elapsed):
+        seconds = int(max(0, elapsed))
+        timer = "%02d:%02d" % (seconds // 60, seconds % 60)
+        spinner = "|/-\\"[tick % 4]
+        if self.width >= 62:
+            size, marker = 18, "<==>"
+            travel = size - len(marker)
+            position = tick % (travel * 2)
+            position = position if position <= travel else travel * 2 - position
+            bar = "[" + "-" * position + marker + "-" * (travel - position) + "]"
+            tail = "  " + bar + "  " + timer
+        else:
+            tail = "  " + timer
+        prefix = "  [%s] " % spinner
+        room = max(1, self.width - _width(prefix + tail) - 1)
+        return prefix + label[:_take(label, room)] + tail
 
     @contextmanager
-    def status(self, message):
+    def status(self, message, tone="accent"):
         self._prepare()
-        if not self.interactive or not self._vt or self.plain or os.environ.get("TERM") == "dumb":
+        if not self.animated:
             yield self
             return
         activity = _Activity()
-        label = clean_text(message).replace("\n", " ")
+        label = clean_text(message).replace("\n", " ").expandtabs(2)
         started = time.monotonic()
 
         def animate():
             tick = 0
             while not activity.stop.is_set():
-                value = "  %s %s  %.1fs" % ("|/-\\"[tick % 4], label, time.monotonic() - started)
-                value = value[:max(1, self.width - 1)]
+                value = self._activity_frame(label, tick, time.monotonic() - started)
                 with self._lock:
                     if activity.stop.is_set():
                         break
-                    self._raw("\r" + self._style(value, "dim") + " " * max(0, activity.length - _width(value)))
+                    self._raw("\r\033[2K" + self._style(value, tone))
                     activity.length = _width(value)
                 tick += 1
-                activity.stop.wait(0.1)
+                activity.stop.wait(FRAME_INTERVAL)
 
         activity.thread = threading.Thread(target=animate, name="local-agent-status", daemon=True)
         with self._lock:
             self._activity = activity
-        activity.thread.start()
         try:
+            activity.thread.start()
             yield self
         finally:
             self._stop_activity(activity)
@@ -462,7 +563,8 @@ class TerminalUI:
                     self._line(line, "error" if text.startswith("Error:") else None, prefix="  ")
                 if not self.verbose and len(lines) > 8:
                     self._line("... additional output saved", "dim", prefix="  ")
-            footer = "%.1fs" % max(0, elapsed)
+            failed = text.startswith("Error:") or isinstance(data, dict) and (data.get("error") or data.get("state") == "failed")
+            footer = ("[!] Request failed" if failed else "[OK] Response received") + "  |  %.1fs" % max(0, elapsed)
             if output_id:
                 footer += "  |  /output " + clean_text(output_id)
             self._line(footer, "dim", prefix="  ")
@@ -621,8 +723,12 @@ class TerminalUI:
         if data.get("error"):
             self._line(data["error"], "error", prefix="  ")
         events = data.get("events") or []
-        for event in events if self.verbose else events[-3:]:
-            self._line("%s  %s" % (event.get("computer", ""), event.get("message", "")), "dim", prefix="  ")
+        if events:
+            self._heading("RECORDED ACTIVITY", tone="dim")
+        for event in events if self.verbose else events[-5:]:
+            self._line("[LOG] %s  %s" % (event.get("computer", ""), event.get("message", "")), "dim", prefix="  ")
+        if state in ("queued", "running"):
+            self._line("[>] Background work continues. Refresh with /jobs " + str(data.get("id", data.get("job_id", ""))), "warning", prefix="  ")
         note = data.get("verification_note")
         if note or data.get("kind") == "deploy" or any(r.get("application_verified") is False for r in results):
             self._line(note or "Installer exit codes describe script execution. Application health is not verified.", "warning", prefix="  ")
