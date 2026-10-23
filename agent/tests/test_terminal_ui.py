@@ -10,12 +10,24 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from terminal_ui import TerminalUI, clean_text
+from terminal_ui import TerminalUI, clean_text, _width
 
 
 class TTYStream(io.StringIO):
     def isatty(self):
         return True
+
+
+class UTF8TTYStream(TTYStream):
+    @property
+    def encoding(self):
+        return "utf-8"
+
+
+class LegacyTTYStream(TTYStream):
+    @property
+    def encoding(self):
+        return "cp1252"
 
 
 class AsciiStream(io.StringIO):
@@ -25,6 +37,85 @@ class AsciiStream(io.StringIO):
 
 
 class TerminalUITests(unittest.TestCase):
+    def test_roles_have_distinct_body_colours_and_readable_icon_headings(self):
+        stream = UTF8TTYStream()
+        with patch.dict(os.environ, {"WT_SESSION": "test"}, clear=True), patch("terminal_ui._enable_vt", return_value=True):
+            ui = TerminalUI(stream=stream, width=36)
+        ui.user("Check PC-1\x1b[2J")
+        ui.write_thinking("Checking the target.")
+        for piece in ("Target ", "**ready", "**", "*"):
+            ui.write_response(piece)
+        ui.end_response()
+        ui.tool_start("inspect_computer", {"computer": "PC-1"})
+        text = stream.getvalue()
+        for role, body in (("user", "Check PC-1"), ("dim", "Checking the target."), ("assistant", "Target ")):
+            self.assertIn("\x1b[" + ui._tones[role] + "m" + body, text)
+        self.assertEqual(len({ui._tones[r] for r in ("user", "assistant", "dim")}), 3)
+        self.assertIn("\x1b[1;" + ui._tones["assistant"] + "mready", text)
+        self.assertIn("\x1b[" + ui._tones["assistant"] + "m*", text)
+        shown = clean_text(text)
+        for label in ("\U0001f4ac You", "\U0001f916 AXIS", "\U0001f4ad Thinking", "\U0001f527 Inspect computer"):
+            self.assertIn(label, shown)
+        self.assertTrue(all(_width(line) <= 36 for line in shown.splitlines()))
+        self.assertNotIn("\x1b[2J", text)
+        self.assertIsNone(ui._activity)
+
+    def test_role_icons_fall_back_to_text_without_terminal_support(self):
+        cases = ((UTF8TTYStream, True, {}, True),
+                 (UTF8TTYStream, False, {"NO_COLOR": "1"}, True),
+                 (UTF8TTYStream, False, {"TERM": "dumb"}, True),
+                 (UTF8TTYStream, False, {}, False),
+                 (LegacyTTYStream, False, {}, True),
+                 (io.StringIO, False, {}, True))
+        for stream_type, plain, environment, vt in cases:
+            with self.subTest(stream=stream_type.__name__, plain=plain, environment=environment, vt=vt):
+                stream = stream_type()
+                with patch.dict(os.environ, environment, clear=True), patch("terminal_ui._enable_vt", return_value=vt):
+                    ui = TerminalUI(stream=stream, plain=plain)
+                ui.user("Check PC-1")
+                ui.write_thinking("Checking.")
+                ui.assistant("Ready.")
+                ui.tool_start("inspect_computer", {})
+                self.assertFalse(ui.icons)
+                self.assertTrue(stream.getvalue().isascii())
+                for label in ("You", "AXIS", "Thinking", "Inspect computer"):
+                    self.assertIn(label, stream.getvalue())
+                if not ui.color:
+                    self.assertNotIn("\x1b", stream.getvalue())
+
+    def test_input_colour_resets_after_success_interrupt_and_eof(self):
+        for failure in (None, KeyboardInterrupt, EOFError):
+            with self.subTest(failure=failure):
+                stream = TTYStream()
+                with patch.dict(os.environ, {}, clear=True), patch("terminal_ui._enable_vt", return_value=True):
+                    ui = TerminalUI(stream=stream)
+
+                def read(prompt):
+                    self.assertEqual(prompt, "")
+                    self.assertTrue(stream.getvalue().endswith("\x1b[" + ui._tones["user"] + "m"))
+                    self.assertIsNone(ui._activity)
+                    self.assertFalse(ui._thinking_open)
+                    if failure:
+                        raise failure()
+                    return "Check PC-1"
+
+                ui._input_fn = read
+                ui.write_thinking("Ready for input.")
+                if failure:
+                    with self.assertRaises(failure):
+                        ui.prompt()
+                else:
+                    self.assertEqual(ui.prompt(), "Check PC-1")
+                self.assertIn("You > ", clean_text(stream.getvalue()))
+                self.assertTrue(stream.getvalue().endswith("\x1b[0m"))
+                self.assertIsNone(ui._activity)
+
+    def test_plain_paste_input_uses_supplied_reader_without_escape_sequences(self):
+        stream = io.StringIO()
+        ui = TerminalUI(stream=stream, plain=True, input_fn=lambda _: self.fail("wrong reader"))
+        self.assertEqual(ui.read_input(input_fn=lambda prompt: "a pasted line"), "a pasted line")
+        self.assertEqual(stream.getvalue(), "")
+
     def test_plain_and_no_color_output_contains_no_ansi(self):
         for plain, environment in ((True, {}), (False, {"NO_COLOR": "1"})):
             stream = TTYStream()

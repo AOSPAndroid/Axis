@@ -12,19 +12,24 @@ Atlas is not needed.
 
 The terminal opens with the AXIS ASCII logo and shows the model/workspace,
 readable tool activity and job tables. Responses are labelled AXIS.
+Your questions are purple, Axis's answers cyan and thinking grey. Small role
+icons appear in interactive UTF-8 terminals (Windows Terminal on Windows);
+text labels remain in all modes.
+Approvals are amber, errors red and successful tool results green.
 Narrow terminals and --plain use a compact AXIS heading.
 /help lists commands. /jobs checks deployments without using the model;
 /status shows settings; /output reads saved tool results; /paste enters a
 multiline request (finish with a single . line). Ctrl+C cancels the current
 request and returns to the prompt. /exit closes the chat. Accepted background
 IT jobs continue. Thinking is enabled and displayed by default. --plain disables
-colour/animation in startup and chat. Tool output is expanded by default;
+colour, icons and animation in startup and chat. Tool output is expanded by default;
 --compact uses shorter tool summaries while keeping thinking visible.
 Run "Start Agent.bat --plain" for the compact display. NO_COLOR, TERM=dumb
-and redirected output also disable colour and animation.
+and redirected output also disable colour, icons and animation. Legacy terminal
+encodings omit icons; your terminal's font determines their appearance.
 
 The ASCII interface uses only Python's standard library. A simple spinner
-animates at eight frames per second and stop before input or approval prompts.
+animates at eight frames per second and stops before input or approval prompts.
 Streamed text is batched for up to about 125 ms between display updates.
 The startup logo reveal takes about 150 ms. Loading shows elapsed time, not
 an estimated percentage. Job logs show recorded events; /jobs ID refreshes

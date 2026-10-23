@@ -24,9 +24,12 @@ AXIS_LOGO = (
 
 
 _ANSI = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]|\x1b[@-_]", re.S)
-_TONES = {"accent": "36", "info": "36", "dim": "90", "warning": "33", "error": "31", "success": "32"}
+_TONES = {"accent": "36", "info": "36", "user": "35", "assistant": "36", "dim": "90",
+          "warning": "33", "error": "31", "success": "32"}
 _RGB_TONES = {"accent": "38;2;96;223;255", "info": "38;2;96;223;255", "dim": "38;2;148;163;184",
+              "user": "38;2;196;181;253", "assistant": "38;2;96;223;255",
               "warning": "38;2;255;198;109", "error": "38;2;248;113;113", "success": "38;2;178;224;117"}
+_ICONS = {"user": "\U0001f4ac", "assistant": "\U0001f916", "thinking": "\U0001f4ad", "tool": "\U0001f527"}
 FRAME_INTERVAL = 0.125  # Eight frames per second; no animation thread while idle.
 STREAM_BUFFER_LIMIT = 1024
 _TITLES = {"inspect_computer": "Inspect computer", "find_packages": "Find packages",
@@ -132,6 +135,8 @@ class TerminalUI:
         self.color = self.interactive and self._vt and not self.plain and "NO_COLOR" not in os.environ and os.environ.get("TERM") != "dumb"
         self.animated = self.color
         self.unicode = False  # ASCII layout works in Windows Console and narrow/legacy terminals.
+        encoding = (getattr(self.stream, "encoding", None) or "").lower().replace("-", "").replace("_", "")
+        self.icons = self.color and encoding == "utf8" and (os.name != "nt" or bool(os.environ.get("WT_SESSION")))
         self._tones = _RGB_TONES if os.environ.get("WT_SESSION") or os.environ.get("COLORTERM") in ("truecolor", "24bit") else _TONES
         self._lock = threading.RLock()
         self._activity = None
@@ -161,6 +166,9 @@ class TerminalUI:
         if tone:
             codes.append(self._tones.get(tone, "36"))
         return ("\033[" + ";".join(codes) + "m" + text + "\033[0m") if codes else text
+
+    def _label(self, role, text):
+        return (_ICONS[role] + " " if self.icons else "") + text
 
     def _raw(self, text):
         try:
@@ -287,10 +295,28 @@ class TerminalUI:
             self._line("Ctrl+C cancels the current request. /exit exits the chat.", "dim", prefix="  ")
 
     def prompt(self):
+        return self.read_input("\n" + self._label("user", "You") + " > ")
+
+    def read_input(self, prompt="", input_fn=None):
+        """Colour terminal input echo, including pasted lines, then always reset."""
         self._prepare()
         with self._lock:
-            self._raw("\n" + self._style("You", "accent", True) + self._style(" > ", "dim"))
-        return (self._input_fn or input)("")
+            self._raw(self._style(clean_text(prompt), "user", True))
+            if self.color:
+                self._raw("\033[" + self._tones["user"] + "m")
+        try:
+            return (input_fn or self._input_fn or input)("")
+        finally:
+            if self.color:
+                with self._lock:
+                    self._raw("\033[0m")
+
+    def user(self, text):
+        self._prepare()
+        with self._lock:
+            self._line()
+            self._heading(self._label("user", "You"), tone="user")
+            self._line(text, "user")
 
     def confirm(self, action):
         self._prepare()
@@ -339,7 +365,7 @@ class TerminalUI:
         with self._lock:
             if not self._response_open:
                 self._line()
-                self._heading("AXIS")
+                self._heading(self._label("assistant", "AXIS"), tone="assistant")
                 self._response_open = True
                 self._response_bold = False
                 self._pending_star = ""
@@ -371,7 +397,7 @@ class TerminalUI:
             if i:
                 self._response_bold = not self._response_bold
             if part:
-                output.append(self._style(part, bold=self._response_bold))
+                output.append(self._style(part, "assistant", bold=self._response_bold))
         if output:
             self._raw("".join(output))
 
@@ -381,7 +407,7 @@ class TerminalUI:
             if self._response_open:
                 self._flush_response()
                 if self._pending_star:
-                    self._raw(self._pending_star)
+                    self._raw(self._style(self._pending_star, "assistant", bold=self._response_bold))
                 self._raw("\n")
                 self._response_open = False
                 self._response_bold = False
@@ -395,7 +421,7 @@ class TerminalUI:
         self.end_response()
         with self._lock:
             if not self._thinking_open:
-                self._heading("Thinking", tone="dim")
+                self._heading(self._label("thinking", "Thinking"), tone="dim")
                 self._thinking_open = True
                 self._start_stream_flush()
 
@@ -469,7 +495,7 @@ class TerminalUI:
     def tool_start(self, name, args):
         self._prepare()
         with self._lock:
-            self._heading(_TITLES.get(name, clean_text(name).replace("_", " ").title()))
+            self._heading(self._label("tool", _TITLES.get(name, clean_text(name).replace("_", " ").title())))
             if isinstance(args, dict):
                 fields = []
                 for key in ("computer", "computers", "view", "action", "package", "script", "name", "pid", "query", "url", "offset", "link_offset", "path", "identity", "command"):

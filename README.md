@@ -8,7 +8,7 @@ Axis has its own deployment, directory and machine inspection tools. **Atlas doe
 
 ![Axis ASCII interface showing public web research](docs/images/06-ascii-ui.png)
 
-Actual terminal renderer with scripted example data. Axis has a simple ASCII logo, coloured tool panels and a small rotating spinner. Thinking is displayed as it arrives, with expanded tool results; final replies focus on the result or the next decision. Use `--compact` for shorter tool summaries. The interface uses only Python's standard library; animations stop while you type. Run `Start Agent.bat --plain` for a compact display without colour or motion.
+Actual terminal renderer with scripted example data. Your questions appear in purple, Axis's answers in cyan, and thinking in grey, with small role icons in supported terminals. Axis keeps its simple ASCII logo, labelled tool panels and small rotating spinner. Thinking is displayed as it arrives, with expanded tool results; final replies focus on the result or the next decision. Use `--compact` for shorter tool summaries. The interface uses only Python's standard library; animations stop while you type. Run `Start Agent.bat --plain` for a compact display without colour, icons or motion.
 
 ## Quick start
 

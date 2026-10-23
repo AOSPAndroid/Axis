@@ -1046,7 +1046,7 @@ def paste_request(ui, input_fn=None):
     lines = []
     try:
         while True:
-            line = read()
+            line = ui.read_input(input_fn=lambda _: read())
             if line == ".":
                 return "\n".join(lines).strip()
             lines.append(line)
@@ -1092,7 +1092,9 @@ def main(argv=None):
                       a.package_repo, a.state_dir, a.max_steps, a.deployment_timeout, ui=ui,
                       web_enabled=not a.no_web, sampling=sampling)
         if a.task:
-            answer = agent.run(" ".join(a.task))
+            task = " ".join(a.task)
+            ui.user(task)
+            answer = agent.run(task)
             if not agent.answer_shown:
                 ui.assistant(answer)
             if agent.speed():

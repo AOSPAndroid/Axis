@@ -6,9 +6,9 @@ The workflow screenshots use scripted model replies and sample PC names, people 
 
 ![Current Axis ASCII interface](images/06-ascii-ui.png)
 
-The startup logo reveals briefly, and a small ASCII spinner rotates while the model loads or a request runs. Animations stop before input and approval prompts. Thinking and answers are displayed separately in short batches, with labelled tool results kept in normal scrollback. Loading indicators show elapsed time; deployment panels show recorded events and refresh with `/jobs ID`. Colours follow your terminal capabilities and background theme.
+The startup logo reveals briefly, and a small ASCII spinner rotates while the model loads or a request runs. Animations stop before input and approval prompts. Your questions are purple, Axis's answers cyan and thinking grey, with small role icons in interactive UTF-8 terminals. Thinking and answers are displayed separately in short batches, with labelled tool results kept in normal scrollback. Loading indicators show elapsed time; deployment panels show recorded events and refresh with `/jobs ID`. Colours and emoji appearance follow your terminal capabilities, font and background theme.
 
-For a compact display, launch `Start Agent.bat --plain`. This disables the logo, colour and motion in startup and chat. `NO_COLOR`, `TERM=dumb` and redirected output also disable colour and motion. The interface adds no third-party Python dependencies.
+On Windows, use Windows Terminal to see the role icons. For a compact display, launch `Start Agent.bat --plain`. This disables the logo, colour, icons and motion in startup and chat. `NO_COLOR`, `TERM=dumb` and redirected output also disable colour, icons and motion; legacy encodings omit icons. Text labels remain in every mode. The interface adds no third-party Python dependencies.
 
 - [What Axis can and can't do](#what-axis-can-and-cant-do)
 - [What you need](#what-you-need)
