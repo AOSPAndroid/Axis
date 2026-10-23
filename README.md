@@ -1,5 +1,7 @@
 # Axis
 
+**[Download Axis for Windows — local-agent-windows.zip](https://github.com/AOSPAndroid/Axis/releases/download/local-agent-windows/local-agent-windows.zip)**
+
 **A local AI assistant for IT support on Windows.** Axis runs your model on your own PC with llama.cpp. It chats, researches public web pages, deploys packages and checks PCs on your network. Supported read-only operations run straight away; changes ask for approval by default. Web searches send queries to a search provider and page reads contact the requested website.
 
 Axis has its own deployment, directory and machine inspection tools. **Atlas does not need to be installed or running.**
