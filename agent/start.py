@@ -354,6 +354,7 @@ def server_model():
 
 def main(argv=None):
     p = argparse.ArgumentParser(description="Start llama-server and Axis.")
+    p.add_argument("--setup-firecrawl", action="store_true", help="save a Firecrawl API key in your user profile, then exit")
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
                    help="folder the agent works in (default: the workspace folder here)")
     p.add_argument("--ctx", type=int, help="context size in tokens (default: model setting, otherwise 16384)")
@@ -369,6 +370,10 @@ def main(argv=None):
     g.add_argument("--cpu", action="store_true", help="always run on the processor")
     g.add_argument("--gpu", action="store_true", help="try the graphics card even if none was detected")
     a, agent_args = p.parse_known_args(argv)
+
+    if a.setup_firecrawl:
+        from web_tools import configure_firecrawl
+        return configure_firecrawl()
 
     key, model = prepare_model(a.model)
     settings = MODELS[key]

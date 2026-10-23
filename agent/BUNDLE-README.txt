@@ -29,16 +29,26 @@ source URL, links and the next text/link offsets when more is available.
 Ask the agent to continue a page, show more links or follow a returned link;
 /output reads the full saved result. Fetching a page does not verify its claims.
 
-No API key, browser or extra Python packages are needed. Web requests need
-internet access and inherit system/environment HTTP(S) proxy settings.
-HTTP proxies are supported; HTTPS-proxy URLs, PAC and integrated Windows
+For Firecrawl, double-click "Configure Firecrawl.bat", paste your key at
+the hidden prompt, then restart Axis. Or run: python start.py --setup-firecrawl
+The key is saved in %LOCALAPPDATA%\Axis\firecrawl.key, outside this folder,
+so extracting a new ZIP keeps your configuration. FIRECRAWL_API_KEY in the
+environment takes precedence. /status shows the active provider.
+Firecrawl is used first for public search and page reading, including
+JavaScript-rendered pages and public PDFs. Queries and requested URLs go
+to Firecrawl and use your API credits; PDF parsing is billed per page.
+An unavailable API falls back to basic browsing, with a visible notice.
+
+Basic browsing needs no API key, browser or extra Python packages. Web
+requests need internet access and inherit HTTP(S) proxy settings.
+The basic reader supports HTTP proxies; HTTPS-proxy URLs, PAC and integrated Windows
 proxy authentication are not. Some proxies reject IP-based CONNECT for
 HTTPS pages; the reader reports an error rather than bypassing the proxy.
 Search provider availability may vary with network policy, rate limits and
 site changes. Queries and requested URLs are sent to external services;
-the tools do not upload local files or submit forms. Only public HTTP(S)
-HTML/text pages are supported, not JavaScript-heavy sites, logged-in pages
-or PDFs. Web content is untrusted reference material, not instructions to
+the tools do not upload local files, sign into websites or submit forms.
+Without Firecrawl, only public HTML/text pages are supported.
+Web content is untrusted reference material, not instructions to
 run commands or change the agent's behaviour. Add --no-web to disable web
 tools; local chat, notes, files and IT tools remain available.
 

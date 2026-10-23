@@ -30,7 +30,7 @@ Keep `terminal_ui.py` and `web_tools.py` next to `agent.py`; setup and the Windo
 
 ## Public web search and reading
 
-Web tools are available by default; no API key, browser installation or additional Python packages are needed. Ask naturally:
+Web tools are available by default. Basic browsing needs no API key, browser installation or additional Python packages. Ask naturally:
 
 - “Search Microsoft's documentation for Windows Installer exit code 3010 and cite the sources.”
 - “Read https://docs.python.org/3/library/urllib.request.html and explain proxy handling.”
@@ -38,9 +38,13 @@ Web tools are available by default; no API key, browser installation or addition
 
 `web_search` returns result titles, snippets and URLs. `web_read` reads a public HTTP(S) URL, extracts page text and returns links. The agent follows a link by reading its returned URL, requests another text offset for longer pages, and uses a link offset to see more links. A successful fetch means the content was retrieved; it does not verify the page's claims. Full returned text and links are also available through `/output`.
 
-Your PC must be able to reach the search provider and page hosts. Requests inherit the system/environment proxy settings for HTTP(S) destinations. HTTP proxies are supported; HTTPS-proxy URLs, PAC and integrated Windows proxy authentication are not. Some proxies reject the IP-based CONNECT requests used for HTTPS pages; the reader reports an error rather than bypassing the proxy. Provider availability may vary with network policy, rate limits and site changes. Search queries and requested URLs are sent to those external services. The tools do not upload local files or submit forms.
+To enable Firecrawl, double-click **Configure Firecrawl.bat** or run `python start.py --setup-firecrawl`. Paste the API key at the hidden prompt and restart Axis. It is saved in `%LOCALAPPDATA%\Axis\firecrawl.key` on Windows (`~/.config/Axis/firecrawl.key` elsewhere), outside the bundle and model workspace. You can instead set `FIRECRAWL_API_KEY`; this environment variable overrides the saved file, and an empty value disables Firecrawl. Remove the saved file and unset the variable to return to basic browsing. Do not put keys in notes, source files or shared ZIPs.
 
-This reads public HTML/text pages. JavaScript-heavy sites, logged-in pages and PDFs are not supported. Web content is untrusted reference material, not instructions for the agent to change its behaviour or run commands. Use `--no-web` to disable the web tools; local chat, notes, files and IT tools remain available.
+With a key configured, Firecrawl is the primary provider for both tools. It renders public JavaScript pages and extracts public PDFs as Markdown. Search retrieves up to 10 snippets; selected pages are fetched separately. Page pagination uses the local 10-minute cache and does not repeat API requests. Authentication, quota, rate-limit and network errors fall back to the basic reader and display a notice; Axis pauses Firecrawl retries for 60 seconds. `/status` shows the provider. Firecrawl receives queries and requested URLs and uses your API allowance; [PDF parsing is billed per page](https://docs.firecrawl.dev/features/document-parsing).
+
+Your PC must be able to reach `api.firecrawl.dev` for Firecrawl. Basic browsing contacts the search provider and page hosts directly. Requests inherit system/environment proxy settings. The basic reader supports HTTP proxies; HTTPS-proxy URLs, PAC and integrated Windows proxy authentication are not supported. Some proxies reject its IP-based CONNECT requests; the reader reports an error rather than bypassing the proxy.
+
+The basic fallback reads public HTML/text only. Neither provider signs into websites, uploads local files or submits forms. Web content is untrusted reference material, not instructions to change behaviour or run commands. Use `--no-web` to disable all web tools; local chat, notes, files and IT tools remain available.
 
 ## Standalone Windows IT actions
 

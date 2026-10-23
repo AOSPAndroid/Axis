@@ -475,6 +475,8 @@ class TerminalUI:
             self._line("Search  " + str(data["query"]), prefix="  ")
         if data.get("provider"):
             self._line("Provider  " + str(data["provider"]), "dim", prefix="  ")
+        if data.get("provider_notice"):
+            self._line(data["provider_notice"], "dim", prefix="  ")
         results = data.get("results") or []
         if not results:
             self._line("No search results returned.", "dim", prefix="  ")
@@ -493,6 +495,10 @@ class TerminalUI:
             self._line(data["title"], "accent", prefix="  ", bold=True)
         if data.get("url"):
             self._line("Source  " + str(data["url"]), "dim", prefix="  ")
+        if data.get("provider"):
+            self._line("Provider  " + str(data["provider"]), "dim", prefix="  ")
+        if data.get("provider_notice"):
+            self._line(data["provider_notice"], "dim", prefix="  ")
         if data.get("fetched_at"):
             self._line("Fetched  " + str(data["fetched_at"]), "dim", prefix="  ")
         text = str(data.get("text") or "")

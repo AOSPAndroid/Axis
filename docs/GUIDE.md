@@ -35,7 +35,7 @@ The screenshots illustrate workflows in an earlier Axis console with scripted mo
 
 - need Atlas installed or running, or read the Atlas database. Give Axis an explicit PC name or ask for an Active Directory lookup.
 - treat an installer's exit code as proof the application works. Application health needs a separate check.
-- run JavaScript, sign into websites or read PDFs with the bundled web reader.
+- sign into websites or submit forms; JavaScript pages and PDFs require Firecrawl.
 
 Changes ask for approval by default. `--yes` automatically approves actions for that session.
 
@@ -147,7 +147,11 @@ If monitoring is lost, the result is `unknown`. Inspect the target and logs befo
 
 Ask for a public search or provide a URL, for example: `Search Microsoft's documentation for installer exit code 3010 and cite it.` Axis can read result pages, follow their links and continue long pages in sections. `/output` shows the full returned tool result.
 
-The bundled reader supports public HTML and text, without JavaScript, logins, PDFs or form submissions. Search queries go to the search provider; page reads contact the site. Keep queries generic and leave internal names, credentials and private file content out. `--no-web` disables the web tools.
+For better web research, double-click **Configure Firecrawl.bat**, paste your API key at the hidden prompt, and restart Axis. The key stays in `%LOCALAPPDATA%\Axis\firecrawl.key`, so updating the ZIP preserves it. Alternatively set `FIRECRAWL_API_KEY` in your environment. `/status` shows whether Firecrawl is configured.
+
+Firecrawl provides search, JavaScript page rendering and public PDF extraction. It receives queries and requested URLs and uses your API credits; PDF extraction is billed per page. If it is unavailable, Axis displays a notice and uses the basic HTML/text reader. Pagination of a cached page does not repeat the API request.
+
+Basic browsing works without an API key and supports public HTML/text only. Neither provider signs into websites, submits forms or uploads local files. Keep queries generic and leave internal names, credentials and private file content out. `--no-web` disables both providers.
 
 ## Your notes
 

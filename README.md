@@ -16,6 +16,8 @@ Axis has its own deployment, directory and machine inspection tools. **Atlas doe
 
 If you need a model, download all parts from its [release page](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m). The launcher can check and join them. Read the **[full guide](docs/GUIDE.md)** for models, options, notes and troubleshooting.
 
+For Firecrawl web research, double-click **`Configure Firecrawl.bat`**, paste your API key at the hidden prompt, then restart Axis. The key stays in your Windows user profile and survives ZIP updates. `/status` shows the active web provider. Basic browsing works without a key.
+
 ## What it looks like
 
 | Checking a PC | Using your notes |
@@ -30,7 +32,7 @@ The screenshots illustrate workflows in an earlier Axis console with scripted re
 - **Checks computers** by name: online status, uptime, disks, services, processes, logged-on users, event logs and Active Directory lookups. Read-only commands run without asking.
 - **Fixes things** with your approval: starts and stops services, ends stuck processes, restarts PCs. It reads the state first, asks before the change and checks the result afterwards.
 - **Deploys packages** independently: install, uninstall, repair and copy-only workflows with persistent jobs and logs. `/jobs` checks progress.
-- **Researches the public web**: searches, reads pages and follows source links. JavaScript, logins and PDFs are not supported by the bundled reader.
+- **Researches the public web**: searches, reads pages and follows source links. Configure Firecrawl for JavaScript-rendered pages and public PDFs, with automatic fallback to the basic HTML/text reader. Requests use your Firecrawl allowance. Website logins and form submissions are not supported.
 - **Uses your notes**: runbooks and known fixes in the `notes` folder, searched before it guesses.
 - **Shows its work**: labelled tool activity, result summaries, saved full output through `/output`, and a speed line after each answer.
 
