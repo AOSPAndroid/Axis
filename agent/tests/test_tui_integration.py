@@ -1,4 +1,5 @@
 """Exercise chat/terminal boundaries with no model server or remote Windows PC."""
+import io
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import agent
 import start
+import terminal_ui
 
 
 def event(delta=None, finish_reason=None):
@@ -99,22 +101,84 @@ class TUIIntegrationTests(unittest.TestCase):
 
         self.agent.call_tool.assert_not_called()
         self.ui.end_response.assert_called()
-        self.ui.end_thinking.assert_called()
 
     def test_raw_eof_without_completion_is_reported_as_incomplete(self):
         with self.assertRaises(RuntimeError):
             self.agent.read_stream(iter([event({"content": "Partial answer"})]))
         self.ui.end_response.assert_called()
 
-    def test_stream_interruption_closes_thinking_and_response_channels(self):
+    def test_stream_interruption_closes_response_without_showing_reasoning(self):
         def interrupted():
             yield event({"reasoning_content": "Considering the current state"})
             raise KeyboardInterrupt()
 
         with self.assertRaises(KeyboardInterrupt):
             self.agent.read_stream(interrupted())
-        self.ui.end_thinking.assert_called()
         self.ui.end_response.assert_called()
+        self.ui.write_response.assert_not_called()
+
+    def test_reasoning_stays_hidden_while_spinner_runs_until_answer(self):
+        class TTY(io.StringIO):
+            def isatty(self):
+                return True
+
+        for verbose in (False, True):
+            with self.subTest(verbose=verbose):
+                stream = TTY()
+                with patch.dict(os.environ, {"TERM": "xterm"}, clear=True), \
+                     patch.object(terminal_ui, "_enable_vt", return_value=True):
+                    ui = terminal_ui.TerminalUI(stream=stream, verbose=verbose)
+                self.agent.ui = ui
+                self.agent.think = True
+
+                def model_stream():
+                    worker = ui._activity.thread
+                    yield event({"reasoning_content": "Hidden deliberation"})
+                    self.assertIs(ui._activity.thread, worker)
+                    self.assertTrue(worker.is_alive())
+                    self.assertNotIn("Hidden deliberation", stream.getvalue())
+                    # Inline thinking from other compatible server templates is hidden too.
+                    for piece in ("<thi", "nk>Hidden inline reasoning", "</think>", "Ready."):
+                        yield event({"content": piece})
+                    self.assertFalse(worker.is_alive())
+                    yield event(finish_reason="stop")
+
+                self.agent.chat = Mock(side_effect=lambda: self.agent.read_stream(model_stream()))
+                self.assertEqual(self.agent.run("Check status"), "Ready.")
+                self.assertIsNone(ui._activity)
+                output = terminal_ui.clean_text(stream.getvalue())
+                self.assertIn("Ready.", output)
+                self.assertNotIn("Hidden", output)
+                self.assertNotIn("Hidden", json.dumps(self.agent.messages))
+
+    def test_reasoning_only_spinner_clears_on_interruption_and_output_limit(self):
+        class TTY(io.StringIO):
+            def isatty(self):
+                return True
+
+        for failure in (KeyboardInterrupt, RuntimeError):
+            with self.subTest(failure=failure):
+                stream = TTY()
+                with patch.dict(os.environ, {"TERM": "xterm"}, clear=True), \
+                     patch.object(terminal_ui, "_enable_vt", return_value=True):
+                    ui = terminal_ui.TerminalUI(stream=stream)
+                self.agent.ui = ui
+                self.agent.think = True
+                workers = []
+
+                def model_stream():
+                    workers.append(ui._activity.thread)
+                    yield event({"reasoning_content": "Hidden deliberation"})
+                    if failure is KeyboardInterrupt:
+                        raise KeyboardInterrupt()
+                    yield event(finish_reason="length")
+
+                self.agent.chat = Mock(side_effect=lambda: self.agent.read_stream(model_stream()))
+                with self.assertRaises(failure):
+                    self.agent.run("Check status")
+                self.assertIsNone(ui._activity)
+                self.assertFalse(workers[0].is_alive())
+                self.assertNotIn("Hidden deliberation", stream.getvalue())
 
     def test_fragmented_tool_arguments_are_assembled_before_dispatch(self):
         stream = [

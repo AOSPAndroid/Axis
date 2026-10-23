@@ -6,7 +6,7 @@ The workflow screenshots use scripted model replies and sample PC names, people 
 
 ![Current Axis ASCII interface](images/06-ascii-ui.png)
 
-The startup logo reveals briefly, and an ASCII activity bar animates while the model loads or a request runs. Animations stop before input and approval prompts. Thinking and answers stream in short batches, with labelled tool results kept in normal scrollback. Loading indicators show elapsed time; deployment panels show recorded events and refresh with `/jobs ID`. Colours follow your terminal capabilities and background theme.
+The startup logo reveals briefly, and a small ASCII spinner rotates while the model loads or a request runs. Animations stop before input and approval prompts. Reasoning text stays hidden and answers stream in short batches, with labelled tool results kept in normal scrollback. Loading indicators show elapsed time; deployment panels show recorded events and refresh with `/jobs ID`. Colours follow your terminal capabilities and background theme.
 
 For a compact display, launch `Start Agent.bat --plain`. This disables the logo, colour and motion in startup and chat. `NO_COLOR`, `TERM=dumb` and redirected output also disable colour and motion. The interface adds no third-party Python dependencies.
 
@@ -173,15 +173,13 @@ Keep notes to procedures and environment facts, not staff or directory data.
 
 ## Thinking mode
 
-Thinking is enabled and visible by default. Double-click `Start Agent.bat` normally: the model's reasoning streams in grey before its answer. Tool results stay compact, and `--verbose` expands them separately.
+Thinking remains enabled by default. Double-click `Start Agent.bat` normally: a small rotating spinner shows activity while the model thinks, then the answer appears. Reasoning text stays out of the chat. Tool results stay compact; `--verbose` expands tool results without exposing reasoning.
 
 For faster answers without thinking, run:
 
 ```
 "Start Agent.bat" --no-think
 ```
-
-![Thinking mode: the model's reasoning in grey, then the answer](images/05-think.png)
 
 Thinking can delay the final answer. If you are reusing a server started with thinking disabled, restart it with the new settings.
 
@@ -192,9 +190,9 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | Option | What it does |
 | --- | --- |
 | `--model KEY` | Use this model without asking (see [model keys](#choosing-a-model)). |
-| `--think` | Enable and show model reasoning. This is the default. |
+| `--think` | Enable model reasoning, shown as a spinner. This is the default. |
 | `--no-think` | Disable thinking for faster answers. |
-| `--verbose` | Expand tool results; thinking is already shown by default. |
+| `--verbose` | Expand tool results; reasoning text stays hidden. |
 | `--plain` | Use compact headings without the logo, colour or animation in startup and chat. `NO_COLOR` also disables colour and animation. |
 | `--no-web` | Disable public web search and page reads. |
 | `--cpu` | Use only the processor, even if a graphics card is found. |

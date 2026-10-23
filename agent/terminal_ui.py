@@ -136,13 +136,11 @@ class TerminalUI:
         self._lock = threading.RLock()
         self._activity = None
         self._response_open = False
-        self._thinking_open = False
         self._response_bold = False
         self._pending_star = ""
         self._response_buffer = []
-        self._thinking_buffer = []
-        self._response_size = self._thinking_size = 0
-        self._response_flushed = self._thinking_flushed = 0
+        self._response_size = 0
+        self._response_flushed = 0
         self._intro_shown = False
 
     @property
@@ -184,7 +182,6 @@ class TerminalUI:
     def _prepare(self, close_streams=True):
         self._stop_activity()
         if close_streams:
-            self.end_thinking()
             self.end_response()
 
     def _line(self, value="", tone=None, prefix="", bold=False):
@@ -228,7 +225,6 @@ class TerminalUI:
             if reveal and self.animated and not self._intro_shown:
                 time.sleep(0.03)
         self._intro_shown = True
-        self._line("LOCAL INTELLIGENCE. REAL ACTIONS.", "dim", prefix="  ")
         self._line()
 
     def startup(self, model):
@@ -318,7 +314,6 @@ class TerminalUI:
                 with self._lock:
                     if activity.stop.is_set():
                         break
-                    self._flush_thinking()
                     self._flush_response()
 
         activity.thread = threading.Thread(target=flush, name="local-agent-stream", daemon=True)
@@ -334,7 +329,6 @@ class TerminalUI:
         if self._response_open:
             return
         self._stop_activity()
-        self.end_thinking()
         with self._lock:
             if not self._response_open:
                 self._line()
@@ -387,55 +381,12 @@ class TerminalUI:
                 self._pending_star = ""
                 self._response_flushed = 0
 
-    def begin_thinking(self):
-        self._stop_activity()
-        self.end_response()
-        with self._lock:
-            if not self._thinking_open:
-                self._heading("Thinking / REASONING", tone="dim")
-                self._thinking_open = True
-                self._start_stream_flush()
-
-    def write_thinking(self, text):
-        if not self._thinking_open:
-            self.begin_thinking()
-        with self._lock:
-            self._thinking_buffer.append(text)
-            self._thinking_size += len(text)
-            if (not self.animated or self._thinking_size >= STREAM_BUFFER_LIMIT or
-                    time.monotonic() - self._thinking_flushed >= FRAME_INTERVAL):
-                self._flush_thinking()
-
-    def _flush_thinking(self):
-        if self._thinking_buffer:
-            self._raw(self._style(clean_text("".join(self._thinking_buffer)), "dim"))
-            self._thinking_buffer.clear()
-            self._thinking_size = 0
-            self._thinking_flushed = time.monotonic()
-
-    def end_thinking(self):
-        self._stop_activity()
-        with self._lock:
-            if self._thinking_open:
-                self._flush_thinking()
-                self._raw("\n")
-                self._thinking_open = False
-                self._thinking_flushed = 0
-
     def _activity_frame(self, label, tick, elapsed):
         seconds = int(max(0, elapsed))
         timer = "%02d:%02d" % (seconds // 60, seconds % 60)
         spinner = "|/-\\"[tick % 4]
-        if self.width >= 62:
-            size, marker = 18, "<==>"
-            travel = size - len(marker)
-            position = tick % (travel * 2)
-            position = position if position <= travel else travel * 2 - position
-            bar = "[" + "-" * position + marker + "-" * (travel - position) + "]"
-            tail = "  " + bar + "  " + timer
-        else:
-            tail = "  " + timer
-        prefix = "  [%s] " % spinner
+        tail = "  " + timer
+        prefix = "  %s " % spinner
         room = max(1, self.width - _width(prefix + tail) - 1)
         return prefix + label[:_take(label, room)] + tail
 

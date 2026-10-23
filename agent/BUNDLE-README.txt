@@ -17,13 +17,13 @@ Narrow terminals and --plain use a compact AXIS heading.
 /status shows settings; /output reads saved tool results; /paste enters a
 multiline request (finish with a single . line). Ctrl+C cancels the current
 request and returns to the prompt. /exit closes the chat. Accepted background
-IT jobs continue. Thinking is enabled and shown by default. --plain disables
+IT jobs continue. Thinking is enabled by default and shown as a spinner. --plain disables
 colour/animation in startup and chat; --verbose expands tool output.
 Run "Start Agent.bat --plain" for the compact display. NO_COLOR, TERM=dumb
 and redirected output also disable colour and animation.
 
-The ASCII interface uses only Python's standard library. Activity indicators
-animate at eight frames per second and stop before input or approval prompts.
+The ASCII interface uses only Python's standard library. A simple spinner
+animates at eight frames per second and stop before input or approval prompts.
 Streamed text is batched for up to about 125 ms between display updates.
 The startup logo reveal takes about 150 ms. Loading shows elapsed time, not
 an estimated percentage. Job logs show recorded events; /jobs ID refreshes
@@ -109,7 +109,7 @@ files in the "notes" folder. The agent searches them before guessing, and
 always reads notes\ALWAYS.md (keep it short). notes\EXAMPLE.md shows the
 format. Re-extracting the zip only replaces EXAMPLE.md.
 
-The model's thinking appears in grey before its answer automatically.
+The model's thinking stays out of the chat; a small spinner shows activity.
 Just double-click "Start Agent.bat". For faster answers without thinking,
 start with: "Start Agent.bat" --no-think
 Restart an existing model server if it was started with thinking disabled.

@@ -8,9 +8,9 @@ It needs Python 3.8 or newer and nothing else.
 
 ## Terminal interface
 
-The console opens with an AXIS ASCII logo, the active model, context, thinking/approval mode, workspace and package repository. Narrow terminals and `--plain` use a compact AXIS heading. Responses appear under AXIS with clearly labelled tool activity; inspections and deployment results use compact tables. Web searches show titles, snippets and source URLs; page reads show an excerpt, links and the next text offset when more is available. During model/tool work an elapsed-time indicator runs in interactive terminals. Thinking is enabled by default and the model's reasoning streams in grey before its answer. Tool output stays compact; add `--verbose` to expand it, or `--no-think` to disable thinking for faster answers.
+The console opens with an AXIS ASCII logo, the active model, context, thinking/approval mode, workspace and package repository. Narrow terminals and `--plain` use a compact AXIS heading. Responses appear under AXIS with clearly labelled tool activity; inspections and deployment results use compact tables. Web searches show titles, snippets and source URLs; page reads show an excerpt, links and the next text offset when more is available. During model/tool work an elapsed-time indicator runs in interactive terminals. Thinking remains enabled by default, with a small rotating spinner instead of reasoning text. Tool output stays compact; add `--verbose` to expand it, or `--no-think` to disable thinking for faster answers.
 
-The interface uses only the standard library and keeps normal terminal scrollback. Its ASCII layout adapts to narrow windows. Active indicators animate at eight frames per second; streamed text is buffered for up to about 125 ms or 1,024 characters between flushes. Display workers stop before prompts and approvals and when work ends. The startup logo reveal adds about 150 ms. Model loading shows activity and elapsed time because the server supplies no reliable percentage. Deployment logs show recorded events; `/jobs ID` refreshes background progress.
+The interface uses only the standard library and keeps normal terminal scrollback. Its ASCII layout adapts to narrow windows. A simple spinner animates at eight frames per second; streamed text is buffered for up to about 125 ms or 1,024 characters between flushes. Display workers stop before prompts and approvals and when work ends. The startup logo reveal adds about 150 ms. Model loading shows activity and elapsed time because the server supplies no reliable percentage. Deployment logs show recorded events; `/jobs ID` refreshes background progress.
 
 `Start Agent.bat --plain` disables the logo, colour and animation in both startup and chat. `NO_COLOR`, `TERM=dumb` and redirected output also disable colour and animation. Windows Terminal supports the cyan/green/amber palette; other terminals use standard ANSI colours where available. Your terminal controls the background. Model/file/command text cannot inject terminal control sequences. Approval panels show the complete wrapped action, with control characters made visible.
 
@@ -157,7 +157,7 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--workdir` | current folder | The only folder the file tools may use |
 | `--ctx` | `16384` | Must match the server's `-c`; older history is compacted to fit |
 | `--yes` | off | Approve writes and commands without asking |
-| `--think` | on | Enable model thinking and show its reasoning; slower and uses more context |
+| `--think` | on | Enable model thinking, shown as a spinner; slower and uses more context |
 | `--no-think` | off | Disable thinking for faster answers |
 | `--temperature`, `--top-p` | 0.6 and 0.95 with thinking; 0.3 and 0.9 without | Sampling overrides; the launcher uses model-specific defaults when present |
 | `--no-web` | off | Disable public web search and page reading |
@@ -166,13 +166,13 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--max-steps` | `30` | Maximum model/tool rounds per request (1–200) |
 | `--deployment-timeout` | `3600` | Copy/installer monitoring timeout in seconds (60–86400) |
 | `--plain` | off | Disable colours and animation |
-| `--verbose` | off | Show full tool output; reasoning is already visible by default |
+| `--verbose` | off | Show full tool output; reasoning text stays hidden |
 
 ## Your notes
 
 Put runbooks, procedures, known fixes and names as `.md` or `.txt` files in the `notes` folder next to `agent.py` (or pass `--notes DIR`). The agent sees the list of files, searches them with `search_notes` before guessing, and opens one with `read_note`. `notes/ALWAYS.md` is loaded into every conversation, so keep it short. `notes/EXAMPLE.md` shows the format.
 
-The model's reasoning is enabled and shown, dimmed, before the answer by default. `--no-think` disables thinking. If a reused model server was started with thinking disabled, restart it to apply the new default.
+The model's reasoning is enabled by default but stays out of the chat; a spinner shows activity until the answer arrives. `--no-think` disables thinking. If a reused model server was started with thinking disabled, restart it to apply the new default.
 
 ## Notes
 

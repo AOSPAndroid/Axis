@@ -25,7 +25,7 @@
   {
     "key": "k2",
     "name": "K2-Horizon-MoVA-36B-A4B",
-    "note": "reasoning model; thinking shown in grey",
+    "note": "reasoning model",
     "tag": "k2-horizon-mova-36b-a4b-q4-k-m",
     "file": "K2-Horizon-MoVA-36B-A4B-Q4_K_M.gguf",
     "size": 22368011616,

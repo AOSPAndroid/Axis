@@ -379,7 +379,7 @@ def main(argv=None):
     p.add_argument("--top-p", type=float, help="override the model's nucleus sampling")
     thinking = p.add_mutually_exclusive_group()
     thinking.add_argument("--think", dest="think", action="store_true", default=True,
-                          help="enable and show model thinking (default)")
+                          help="enable model thinking with a spinner (default)")
     thinking.add_argument("--no-think", dest="think", action="store_false",
                           help="disable model thinking for faster answers")
     g = p.add_mutually_exclusive_group()

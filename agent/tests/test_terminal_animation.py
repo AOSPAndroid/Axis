@@ -52,34 +52,27 @@ class AnimationTests(unittest.TestCase):
         self.assertIsNone(ui._activity)
 
     def test_pending_text_flushes_even_when_the_model_pauses(self):
-        for thinking in (False, True):
-            with self.subTest(thinking=thinking):
-                stream = TTY()
-                ui = animated_ui(stream)
-                write = ui.write_thinking if thinking else ui.write_response
-                try:
-                    write("First fragment ")
-                    write("pending-tail")
-                    self.assertTrue(stream.tail_seen.wait(1.0), "Buffered text was stranded during a network pause")
-                finally:
-                    ui.end_thinking()
-                    ui.end_response()
-                self.assertIsNone(ui._activity)
+        stream = TTY()
+        ui = animated_ui(stream)
+        try:
+            ui.write_response("First fragment ")
+            ui.write_response("pending-tail")
+            self.assertTrue(stream.tail_seen.wait(1.0), "Buffered text was stranded during a network pause")
+        finally:
+            ui.end_response()
+        self.assertIsNone(ui._activity)
 
     def test_approval_stops_stream_worker_and_flushes_tail_before_input(self):
-        for thinking in (False, True):
-            with self.subTest(thinking=thinking):
-                stream = TTY()
-                observed = []
-                ui = animated_ui(stream, input_fn=lambda _: observed.append(
-                    (ui._activity, "pending-tail" in stream.getvalue())) or "n")
-                write = ui.write_thinking if thinking else ui.write_response
-                write("First ")
-                worker = ui._activity.thread
-                write("pending-tail")
-                self.assertFalse(ui.confirm("Restart LAB-PC-042"))
-                self.assertEqual(observed, [(None, True)])
-                self.assertFalse(worker.is_alive())
+        stream = TTY()
+        observed = []
+        ui = animated_ui(stream, input_fn=lambda _: observed.append(
+            (ui._activity, "pending-tail" in stream.getvalue())) or "n")
+        ui.write_response("First ")
+        worker = ui._activity.thread
+        ui.write_response("pending-tail")
+        self.assertFalse(ui.confirm("Restart LAB-PC-042"))
+        self.assertEqual(observed, [(None, True)])
+        self.assertFalse(worker.is_alive())
 
     def test_plain_no_color_and_dumb_terminals_have_no_motion_or_delay(self):
         for options, env in (({"plain": True}, {}), ({}, {"NO_COLOR": "1"}), ({}, {"TERM": "dumb"})):
@@ -98,7 +91,7 @@ class AnimationTests(unittest.TestCase):
                 self.assertNotIn("\x1b", stream.getvalue())
                 self.assertNotIn("\r", stream.getvalue())
 
-    def test_frames_fit_narrow_and_wide_terminals_and_never_invent_percentages(self):
+    def test_spinner_frames_fit_terminal_without_an_activity_bar(self):
         for width in (20, 30, 62, 110):
             ui = animated_ui(TTY(), width=width)
             for tick in range(40):
@@ -106,7 +99,11 @@ class AnimationTests(unittest.TestCase):
                 self.assertLess(terminal._width(frame), width)
                 self.assertIn("02:10", frame)
                 self.assertNotIn("%", frame)
+                self.assertNotIn("[", frame)
+                self.assertNotIn("=", frame)
             self.assertNotEqual(ui._activity_frame("Loading", 0, 1), ui._activity_frame("Loading", 1, 1))
+        self.assertEqual([ui._activity_frame("Thinking", tick, 0).strip() for tick in range(4)],
+                         [char + " Thinking  00:00" for char in "|/-\\"])
 
     def test_failed_thread_start_leaves_no_active_animation(self):
         ui = animated_ui(TTY())

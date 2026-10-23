@@ -31,6 +31,12 @@ MAX_STEPS = 30           # model/tool rounds per task (configurable)
 
 SYSTEM_PROMPT = """You are Axis, a helpful assistant running locally on the user's Windows computer. You chat, answer questions, explain, write and translate like any assistant. You can also use tools to work with files and run PowerShell commands on this computer and on other computers by name.
 
+## Response style
+- Be direct. Lead with the answer, result or one specific question. Normally use 1-3 short sentences; give more detail only when requested or needed to explain a failure.
+- Do not narrate your deliberation, repeat the request or announce every lookup with "I'll check" or "Let me look". Tool labels already show what you are doing. Before making a change, give the brief action summary required below.
+- Ask for missing information as soon as it blocks the next action. Do not keep investigating to avoid asking a necessary question. Stop once the task is answered or the next decision belongs to the user.
+- Reuse results already obtained. Do not repeat an unchanged lookup, including note searches that differ only in capitalisation. Check again when new evidence or a state change requires it, including verification after a change and job-status updates.
+
 ## When to use tools
 - Only when the request needs them: information from a computer, file or website, or an action. For greetings, tests, general questions, writing or explanations, just answer without running anything.
 - If the request is unclear, ask a short question instead of guessing.
@@ -63,6 +69,8 @@ Working directory for the file tools: {workdir}
 - Prefer inspect_computer, find_packages, deploy_package and computer_action to inventing shell commands for supported IT operations. These tools work independently; Atlas does not need to be running.
 - Package repository: {package_repo}. State and deployment logs: {state_dir}.
 - Discover the exact package and its action-specific script before deployment. Use only explicit computer names supplied by the user or found in notes/directory results; ask if a target is ambiguous.
+- If several package versions match and neither the user nor a runbook specifies one, ask one short version question immediately, showing a few exact returned names. Do not inspect the target, browse repository folders or read installer scripts to guess the user's preferred version. Example: "Which version: App8100 or App8189?" If the version is already explicit, continue without asking again.
+- Package search results are sorted by name, not version or release date, and may be paginated. Do not claim a package is the latest from its list position. Use find_packages to resolve the selected package and action script; only investigate further if those results leave a concrete blocker.
 - A deployment or reboot job ID means queued, not successful. Call it_job_status, read each target's result, and distinguish copied, script_succeeded, reboot_required, failed and unknown. Installer exit 0 does not verify application health. Check the application separately before claiming it works.
 - Never automatically retry an unknown outcome. Inspect the target and its log first. Acknowledging an unknown job only releases the target; it does not retry or cancel remote work.
 - Service/process actions require the snapshot returned by a recent inspect_computer call. If identity changed, inspect again. Do not bypass a blocked structured operation with run_command.
@@ -295,7 +303,6 @@ class Agent:
         """Collect a streamed reply, printing visible text as it arrives."""
         live = LiveText(self.ui)
         calls = {}
-        reasoning_open = False
         finished = False
         completed = False
         try:
@@ -318,14 +325,8 @@ class Agent:
                     if reason:
                         finished = True
                     delta = choice.get("delta") or {}
-                    if delta.get("reasoning_content"):
-                        if not reasoning_open:
-                            self.ui.begin_thinking()
-                            reasoning_open = True
-                        self.ui.write_thinking(delta["reasoning_content"])
-                    elif reasoning_open and (delta.get("content") or delta.get("tool_calls")):
-                        self.ui.end_thinking()
-                        reasoning_open = False
+                    # Keep the activity spinner running during reasoning. Only the
+                    # answer is displayed; reasoning is not added to chat history.
                     if delta.get("content"):
                         live.feed(delta["content"])
                     for tc in delta.get("tool_calls") or []:
@@ -339,7 +340,6 @@ class Agent:
                 raise RuntimeError("Model stream ended unexpectedly. No incomplete tool calls were executed; try the request again.")
             completed = True
         finally:
-            self.ui.end_thinking()
             live.finish(final=completed)
         message = {"role": "assistant", "content": live.text, "shown": live.shown > 0}
         if calls:
@@ -949,7 +949,7 @@ def main(argv=None):
     p.add_argument("--top-p", type=float, help="nucleus sampling (default: 0.95 with thinking, otherwise 0.9)")
     thinking = p.add_mutually_exclusive_group()
     thinking.add_argument("--think", dest="think", action="store_true", default=True,
-                          help="enable and show model thinking (default; slower)")
+                          help="enable model thinking with a spinner (default; slower)")
     thinking.add_argument("--no-think", dest="think", action="store_false",
                           help="disable model thinking for faster answers")
     p.add_argument("--notes", help="notes folder (default: the notes folder next to agent.py)")

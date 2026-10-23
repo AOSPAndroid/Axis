@@ -69,14 +69,13 @@ class TerminalUITests(unittest.TestCase):
         self.assertEqual(stream.getvalue().count("[AXIS]"), 1)
         self.assertNotIn("**", stream.getvalue())
 
-    def test_reasoning_is_visible_without_expanding_tool_output(self):
-        for verbose in (False, True):
-            stream = io.StringIO()
-            ui = TerminalUI(stream=stream, plain=True, verbose=verbose)
-            ui.write_thinking("Detailed external model reasoning")
-            ui.end_thinking()
-            self.assertIn("Thinking", stream.getvalue())
-            self.assertIn("Detailed external model reasoning", stream.getvalue())
+    def test_logo_has_no_tagline(self):
+        stream = io.StringIO()
+        ui = TerminalUI(stream=stream, width=90)
+        ui.banner("Qwen", r"C:\Work", 16384, True, False)
+        self.assertIn("AXIS", stream.getvalue())
+        self.assertNotIn("LOCAL INTELLIGENCE", stream.getvalue())
+        self.assertNotIn("REAL ACTIONS", stream.getvalue())
 
     def test_job_state_never_implies_verified_installation(self):
         stream = io.StringIO()

@@ -8,7 +8,7 @@ Axis has its own deployment, directory and machine inspection tools. **Atlas doe
 
 ![Axis ASCII interface showing public web research](docs/images/06-ascii-ui.png)
 
-Actual terminal renderer with scripted example data. Axis has an ASCII logo, coloured tool panels and animated activity indicators. The interface uses only Python's standard library; animations stop while you type. Run `Start Agent.bat --plain` for a compact display without colour or motion.
+Actual terminal renderer with scripted example data. Axis has a simple ASCII logo, coloured tool panels and a small rotating spinner. Reasoning text stays out of the chat; replies focus on the result or the next decision. The interface uses only Python's standard library; animations stop while you type. Run `Start Agent.bat --plain` for a compact display without colour or motion.
 
 ## Quick start
 
