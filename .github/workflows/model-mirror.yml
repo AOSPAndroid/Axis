@@ -19,6 +19,22 @@ jobs:
       max-parallel: 2
       matrix:
         include:
+          - tag: qwen3.8-flash-next-gsq-rco-abliterated-q2-0
+            title: Qwen3.8-Flash-Next GSQ-RCO abliterated Q2_0 (first file, 38.0 GB)
+            hf_repo: SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF
+            hf_rev: eec4e10a2c29b440a2ae85591fa11569ce752963
+            file: Q2_0/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-Q2_0-00001-of-00002.gguf
+            size: '38021379872'
+            sha256: 1620faf21c845524cbe38dcbbaf850b8d155c2299df05d8b7bfb43b642c4647e
+            license: Qwen Community License 1.0, inherited from Qwen3.8-Flash-Next (SC117 labels it Apache-2.0)
+            license_file: LICENSE-QWEN-COMMUNITY-1.0.txt
+            license_url: https://huggingface.co/Qwen/Qwen3.8-Flash-Next/resolve/de4b8e4d43b917e7706784d8bb445c9af86a3540/LICENSE
+            about: >-
+              Community model. SC117 removed refusal behaviour from IST Austria's GSQ-RCO Q2_0 build of
+              Qwen3.8-Flash-Next (125B, 6B active) by replacing 144 tensors; it is not an official Qwen
+              release, may be less reliable and will not decline harmful requests. Only the first file is
+              here: the second file is byte-identical to the one in the qwen3.8-flash-next-gsq-rco-q2-0
+              release, and Axis reuses it.
           - tag: qwen3.8-flash-next-gsq-rco-q2-0
             title: Qwen3.8-Flash-Next GSQ-RCO Q2_0 (125B, 6B active, 66.4 GB)
             hf_repo: ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF

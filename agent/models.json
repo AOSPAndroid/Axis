@@ -190,6 +190,30 @@
     ]
   },
   {
+    "key": "flash-abliterated",
+    "name": "Qwen3.8-Flash-Next abliterated",
+    "note": "community edit without refusals",
+    "tag": "qwen3.8-flash-next-gsq-rco-abliterated-q2-0",
+    "server_args": [
+      "--load-mode",
+      "mmap",
+      "--lazy-mode",
+      "on"
+    ],
+    "files": [
+      {
+        "file": "Qwen3.8-Flash-Next-GSQ-RCO-abliterated-Q2_0-00001-of-00002.gguf",
+        "size": 38021379872,
+        "sha256": "1620faf21c845524cbe38dcbbaf850b8d155c2299df05d8b7bfb43b642c4647e",
+        "parts": []
+      },
+      {
+        "file": "Qwen3.8-Flash-Next-GSQ-RCO-abliterated-Q2_0-00002-of-00002.gguf",
+        "same_as": "Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00002-of-00002.gguf"
+      }
+    ]
+  },
+  {
     "key": "9b-distill",
     "name": "Qwen3.8-9B distill",
     "note": "community distill (the first model)",
