@@ -68,6 +68,20 @@ When a full supported GGUF is present, Axis uses it directly. For model parts, i
 
 If you've downloaded more than one model, Axis asks which one to use. Press Enter for the first one.
 
+## Start Axis and Atlas together
+
+Run **`Start Axis + Atlas.bat`** under your DSK account, just as you run the separate launchers now. Both apps inherit that Windows account; the launcher stores no password. Atlas must already be installed with its dependencies.
+
+The launcher finds Atlas nearby or asks for the folder containing `Start-Office-Atlas.bat`. It remembers that folder in `%LOCALAPPDATA%\Axis\atlas-folder.txt`, so ZIP updates keep the setting. To choose a different installation, run:
+
+```bat
+"Start Axis + Atlas.bat" --atlas-dir "F:\Atlas"
+```
+
+It runs Atlas's existing startup routine for Admin, Viewer and configured collectors, then opens Axis with read-only access to the database Atlas is actually using. Atlas's existing collector account configuration still applies. The helper adds no Python packages and does not copy the database.
+
+Closing Axis leaves Atlas running. Use Atlas's `Stop-All-Atlas.bat` to stop Atlas. **`Start Agent.bat`** still opens Axis on its own.
+
 ## Atlas database
 
 To let Axis find people and their PCs, put your Atlas `office_atlas.db` beside **Start Agent.bat**. You can also point it at the existing file:
@@ -221,6 +235,8 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | `--workdir FOLDER` | The folder Axis may read and write files in. Default: `workspace` next to `start.py`. |
 | `--notes FOLDER` | Use a different notes folder. |
 | `--atlas-db PATH` | Read people and computer inventory from this existing Atlas database. |
+| `--with-atlas` | Start the installed Atlas before Axis and use its active database. Included by `Start Axis + Atlas.bat`. |
+| `--atlas-dir FOLDER` | Choose the Atlas installation for the shared launcher. |
 | `--package-repo PATH` | Override the preconfigured package repository. |
 | `--state-dir FOLDER` | Store persistent jobs and saved tool output in a different folder. |
 | `--yes` | Approve every change without asking. Not recommended on work PCs. |

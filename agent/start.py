@@ -370,6 +370,9 @@ def server_model():
 def main(argv=None):
     p = argparse.ArgumentParser(description="Start llama-server and Axis.")
     p.add_argument("--setup-firecrawl", action="store_true", help="save a Firecrawl API key in your user profile, then exit")
+    p.add_argument("--with-atlas", action="store_true", help="start Atlas with this Windows account and share its active database")
+    p.add_argument("--atlas-dir", help="Atlas installation folder (also enables --with-atlas)")
+    p.add_argument("--atlas-db", help="Atlas database file for standalone Axis; shared startup selects Atlas's active file")
     p.add_argument("--plain", action="store_true", help="disable colour and animation in both startup and chat")
     p.add_argument("--workdir", default=os.path.join(HERE, "workspace"),
                    help="folder the agent works in (default: the workspace folder here)")
@@ -390,6 +393,18 @@ def main(argv=None):
     if a.setup_firecrawl:
         from web_tools import configure_firecrawl
         return configure_firecrawl()
+
+    if a.with_atlas or a.atlas_dir:
+        if a.atlas_db:
+            p.error("--atlas-db is for standalone Axis; shared startup selects Atlas's active database automatically")
+        from launch_atlas import AtlasLaunchError, start_atlas
+        try:
+            a.atlas_db = start_atlas(HERE, a.atlas_dir)
+        except (AtlasLaunchError, OSError, subprocess.SubprocessError) as exc:
+            log("Could not start Axis with Atlas: %s" % exc)
+            return 1
+    if a.atlas_db:
+        agent_args += ["--atlas-db", a.atlas_db]
 
     ui = TerminalUI(plain=a.plain)
     if a.plain:

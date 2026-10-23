@@ -53,7 +53,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp agent/agent.py agent/it_tools.py agent/it_windows.ps1 agent/terminal_ui.py agent/web_tools.py agent/atlas_db.py agent/start.py agent/models.json "agent/Start Agent.bat" "agent/Configure Firecrawl.bat" bundle/local-agent/
+          cp agent/agent.py agent/it_tools.py agent/it_windows.ps1 agent/terminal_ui.py agent/web_tools.py agent/atlas_db.py agent/launch_atlas.py agent/start.py agent/models.json "agent/Start Agent.bat" "agent/Start Axis + Atlas.bat" "agent/Configure Firecrawl.bat" bundle/local-agent/
           mkdir -p bundle/local-agent/notes && cp agent/notes/EXAMPLE.md bundle/local-agent/notes/
           cp agent/BUNDLE-README.txt bundle/local-agent/README.txt
           echo "$GITHUB_SHA" > bundle/local-agent/BUNDLE-COMMIT.txt
@@ -74,11 +74,11 @@ jobs:
           import os
           from pathlib import Path
           import zipfile
-          modules = ('agent.py', 'it_tools.py', 'terminal_ui.py', 'web_tools.py', 'atlas_db.py', 'start.py')
+          modules = ('agent.py', 'it_tools.py', 'terminal_ui.py', 'web_tools.py', 'atlas_db.py', 'launch_atlas.py', 'start.py')
           with zipfile.ZipFile('local-agent-windows.zip') as archive:
               assert archive.testzip() is None, 'Corrupt ZIP member'
               names = archive.namelist()
-              required = modules + ('it_windows.ps1', 'models.json', 'Start Agent.bat', 'Configure Firecrawl.bat', 'README.txt', 'notes/EXAMPLE.md', 'BUNDLE-COMMIT.txt')
+              required = modules + ('it_windows.ps1', 'models.json', 'Start Agent.bat', 'Start Axis + Atlas.bat', 'Configure Firecrawl.bat', 'README.txt', 'notes/EXAMPLE.md', 'BUNDLE-COMMIT.txt')
               for name in required:
                   data = archive.read('local-agent/' + name)
                   assert data, 'Empty bundle file: ' + name
@@ -86,6 +86,9 @@ jobs:
                       ast.parse(data.decode('utf-8'), feature_version=(3, 8))
                   if name in modules + ('it_windows.ps1', 'models.json'):
                       assert data == (Path('agent') / name).read_bytes(), 'Stale bundle file: ' + name
+                  if name.endswith('.bat'):
+                      source = (Path('agent') / name).read_bytes().replace(b'\r\n', b'\n')
+                      assert data == source.replace(b'\n', b'\r\n'), 'Stale launcher: ' + name
               for kind in ('cpu', 'vulkan'):
                   assert any(name.startswith('local-agent/llama-' + kind + '/') and name.endswith('/llama-server.exe') for name in names), 'Missing llama.cpp ' + kind + ' server'
               assert not any(name.lower().endswith('.gguf') for name in names), 'Models must remain separate'

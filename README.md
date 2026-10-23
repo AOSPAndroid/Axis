@@ -18,6 +18,8 @@ Actual terminal renderer with scripted example data. Your questions appear in pu
 2. Copy your full **`Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`** into the `local-agent` folder beside **`Start Agent.bat`**. The launcher uses the existing Python at `C:\devhome\tools\python3.12\current\python.exe` first, with automatic discovery elsewhere if needed (Python 3.8 or newer).
 3. Double-click **`Start Agent.bat`**, wait for the AXIS banner and `You >` prompt, then type a request.
 
+**Start both with your DSK account:** run **`Start Axis + Atlas.bat`** from the same ZIP under DSK. It starts your existing Atlas installation, then Axis, using the same Windows account and Atlas's active database. If needed, it asks once for the folder containing `Start-Office-Atlas.bat` and remembers it. [Shared launcher details](docs/GUIDE.md#start-axis-and-atlas-together).
+
 If you need a model, download all parts from its [release page](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m). The launcher can check and join them. Read the **[full guide](docs/GUIDE.md)** for models, options, notes and troubleshooting.
 
 For Firecrawl web research, double-click **`Configure Firecrawl.bat`**, paste your API key at the hidden prompt, then restart Axis. The key stays in your Windows user profile and survives ZIP updates. `/status` shows the active web provider. Basic browsing works without a key.

@@ -114,7 +114,15 @@ Set `--atlas-db PATH`, `AGENT_ATLAS_DB`, or `ATLAS_DB_PATH` (in that order). Wit
 
 Ask “Find Marie's PCs in Atlas” or “Who is assigned PC-123 in the inventory?” Ambiguous people and device choices remain explicit. Assignment and last logged-on inventory links are labelled separately. These records do not prove that a PC is online or a person is currently signed in; live checks still use the Windows tools. Results show the source and directory import date when stored in the database.
 
-Connections use SQLite `mode=ro` and `query_only`, fixed parameterized lookups and bounded results. No Atlas API, database migration, third-party package or background indexer is used. Each lookup reads a consistent snapshot, including committed WAL changes; repeated identical lookups within one request are reused only while the database/WAL file fingerprints are unchanged. Database records stay local. No database is included in the public ZIP. Use an Atlas backup/export when copying a database that Atlas is updating; copying only the main file can omit committed WAL data.
+Connections use SQLite `mode=ro` and `query_only`, fixed parameterized lookups and bounded results. Inventory lookups need no Atlas API, database migration, third-party package or background indexer. Each lookup reads a consistent snapshot, including committed WAL changes; repeated identical lookups within one request are reused only while the database/WAL file fingerprints are unchanged. Database records stay local. No database is included in the public ZIP. Use an Atlas backup/export when copying a database that Atlas is updating; copying only the main file can omit committed WAL data.
+
+## Shared Windows launcher
+
+`Start Axis + Atlas.bat` runs `start.py --with-atlas` through Axis's existing Python discovery. Run it under DSK to start both apps with that Windows account; no account switching or password storage is added. Atlas must already be installed. Its `Start-Office-Atlas.bat` handles Admin, Viewer, browser opening and configured collectors; any collector-specific account settings remain Atlas's responsibility. An explicit `WMI_PYTHON` is preserved; otherwise Atlas receives Axis's Python when it is 3.12 or newer, or uses its own Python discovery.
+
+`launch_atlas.py` chooses the Atlas installation from `--atlas-dir PATH`, `ATLAS_HOME`, the remembered `%LOCALAPPDATA%\Axis\atlas-folder.txt`, or nearby Atlas folders / `F:\Atlas`. If it cannot choose one, it prompts for the folder containing `Start-Office-Atlas.bat`. A successful launch saves the folder in the user profile. Keep `launch_atlas.py` beside `start.py` when updating manually.
+
+After Atlas starts or reuses its existing servers, the helper verifies the local Admin instance and Windows account and reads its active database path from the local API. Axis then receives that exact path for direct read-only SQLite queries, including when Atlas's on-disk configuration has changed since its server started. Shared startup selects the database automatically; `--atlas-db` is for standalone startup. Closing Axis leaves Atlas running; use Atlas's `Stop-All-Atlas.bat` to stop it. Ordinary `Start Agent.bat` remains independent of Atlas.
 
 ## Offline bundle (Windows, browser downloads only)
 
