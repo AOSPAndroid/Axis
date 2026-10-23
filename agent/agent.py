@@ -36,6 +36,7 @@ SYSTEM_PROMPT = """You are Axis, a helpful assistant running locally on the user
 - Do not narrate your deliberation, repeat the request or announce every lookup with "I'll check" or "Let me look". Tool labels already show what you are doing. Before making a change, give the brief action summary required below.
 - Ask for missing information as soon as it blocks the next action. Do not keep investigating to avoid asking a necessary question. Stop once the task is answered or the next decision belongs to the user.
 - Reuse results already obtained. Do not repeat an unchanged lookup, including note searches that differ only in capitalisation. Check again when new evidence or a state change requires it, including verification after a change and job-status updates.
+- During reasoning, focus on the next unresolved decision. Treat established observations as settled until new evidence changes them. Do not repeatedly reconsider the same options; ask the blocking question or take the supported next step.
 
 ## When to use tools
 - Only when the request needs them: information from a computer, file or website, or an action. For greetings, tests, general questions, writing or explanations, just answer without running anything.
@@ -184,6 +185,9 @@ class Agent:
         self.last_duration = None
         self.last_model = None
         self._active_tool_call_id = None
+        self._lookup_results = {}
+        self._lookup_repeats = set()
+        self._declined_actions = set()
         self.max_reply = min(4096 if think else 2048, ctx // 3)
         # Conservative character estimate; reserve the tool schemas and reply.
         self.history_budget = max(0, int((ctx - self.max_reply) * 3) - len(json.dumps(self.tools)))
@@ -288,7 +292,15 @@ class Agent:
                     if data["choices"][0].get("finish_reason") == "length":
                         raise RuntimeError("Model response reached its output limit. No incomplete tool calls were executed; use more context or split the task.")
                     self.last_model = data.get("model") or self.last_model
-                    return dict(data["choices"][0]["message"], shown=False)
+                    message = data["choices"][0]["message"]
+                    live = LiveText(self.ui)
+                    try:
+                        if message.get("reasoning_content"):
+                            self.ui.write_thinking(message["reasoning_content"])
+                        live.feed(message.get("content") or "")
+                    finally:
+                        live.finish()
+                    return dict(message, shown=live.shown > 0)
                 return self.read_stream(resp)
         except urllib.error.HTTPError as e:
             raise RuntimeError("server returned %s: %s" % (e.code, e.read().decode("utf-8", "replace")[:500]))
@@ -329,8 +341,10 @@ class Agent:
                     if reason:
                         finished = True
                     delta = choice.get("delta") or {}
-                    # Keep the activity spinner running during reasoning. Only the
-                    # answer is displayed; reasoning is not added to chat history.
+                    # Display the local model's reasoning without feeding it back
+                    # into history as part of its answer.
+                    if delta.get("reasoning_content"):
+                        self.ui.write_thinking(delta["reasoning_content"])
                     if delta.get("content"):
                         live.feed(delta["content"])
                     for tc in delta.get("tool_calls") or []:
@@ -367,6 +381,9 @@ class Agent:
         """Work on a task; returns the final answer. answer_shown says whether it was already printed."""
         self.stats = {}
         self.answer_shown = False
+        self._lookup_results.clear()
+        self._lookup_repeats.clear()
+        self._declined_actions.clear()
         self.messages.append({"role": "user", "content": task})
         started = time.monotonic()
         try:
@@ -410,7 +427,7 @@ class Agent:
                 return content
             if content and not msg.get("shown"):
                 self.ui.assistant(content)
-            for call in calls:
+            for index, call in enumerate(calls):
                 name = call["function"]["name"]
                 args = call["function"].get("arguments") or {}
                 if isinstance(args, str):
@@ -422,13 +439,82 @@ class Agent:
                 started = time.monotonic()
                 self._active_tool_call_id = call.get("id", "")
                 with self.ui.status("Running " + name.replace("_", " ")):
-                    result = self.call_tool(name, args)
+                    result, repeated = self.guarded_lookup(name, args)
                 saved = self.save_output(result)
+                if repeated == "reuse":
+                    saved = ("This lookup already ran in this request and was not repeated. Use the earlier result below "
+                             "to take the next step or ask for the specific missing detail; do not call it again.\n" + saved)
+                    self.ui.notice("Reusing the earlier lookup result", "dim")
                 self.messages.append({"role": "tool", "tool_call_id": call.get("id", ""),
                                       "name": name, "content": saved})
                 self._active_tool_call_id = None
                 self.ui.tool_result(name, result, time.monotonic() - started, output_id=self.last_output_id)
+                if repeated == "stop":
+                    for pending in calls[index + 1:]:
+                        self.messages.append({"role": "tool", "tool_call_id": pending.get("id", ""),
+                                              "name": pending.get("function", {}).get("name", ""),
+                                              "content": "Not run: a repeated lookup loop stopped this batch."})
+                    self.messages.append({"role": "assistant", "content": result})
+                    return result
         return "Stopped after %d rounds without finishing. Background IT jobs continue; inspect them with it_job_status." % self.max_steps
+
+    @staticmethod
+    def lookup_key(name, args):
+        """Only stable reference lookups qualify; machine observations always run fresh."""
+        if not isinstance(args, dict):
+            return None
+        if name == "search_notes" and set(args) <= {"query"}:
+            query = args.get("query")
+            if not isinstance(query, str) or not query.strip():
+                return None
+            values = {"query": query.strip().lower()}
+        elif name == "read_note" and set(args) == {"name"} and isinstance(args["name"], str):
+            values = args
+        elif name == "find_packages" and set(args) <= {"query", "package", "action", "offset"}:
+            values = dict(query="", package=None, action="Install", offset=0)
+            values.update(args)
+            if (not isinstance(values["query"], str) or
+                    values["package"] is not None and not isinstance(values["package"], str) or
+                    values["action"] not in ("Install", "Uninstall", "Repair") or
+                    type(values["offset"]) is not int or values["offset"] < 0):
+                return None
+            values["query"] = values["query"].casefold()
+            if values["package"] is not None:
+                values["package"] = values["package"].strip().casefold()
+        elif name == "read_tool_output" and set(args) <= {"output_id", "offset", "limit"}:
+            values = dict(output_id=None, offset=0, limit=2000)
+            values.update(args)
+            if (not isinstance(values["output_id"], str) or
+                    type(values["offset"]) is not int or type(values["limit"]) is not int):
+                return None
+        else:
+            return None
+        return name, json.dumps(values, sort_keys=True, ensure_ascii=False)
+
+    def guarded_lookup(self, name, args):
+        key = self.lookup_key(name, args)
+        observations = {"search_notes", "read_note", "find_packages", "read_tool_output",
+                        "read_file", "list_dir", "inspect_computer", "directory_lookup"} | WEB_TOOL_NAMES
+        read_job = name == "it_job_status" and isinstance(args, dict) and not args.get("acknowledge_unknown")
+        if name not in observations and not read_job:
+            # A command, change or unknown tool may invalidate reference data, even if it fails.
+            self._lookup_results.clear()
+            self._lookup_repeats.clear()
+        if key is not None and key in self._lookup_results:
+            if key in self._lookup_repeats:
+                return ("Stopped because Axis kept repeating the same %s lookup. No remaining actions in this batch "
+                        "were run. Existing background jobs continue." % name, "stop")
+            self._lookup_repeats.add(key)
+            return self._lookup_results[key], "reuse"
+        result = self.call_tool(name, args)
+        if key is not None and not result.startswith("Error:"):
+            try:
+                data = json.loads(result)
+            except (ValueError, TypeError):
+                data = None
+            if not isinstance(data, dict) or not data.get("error"):
+                self._lookup_results[key] = result
+        return result, None
 
     def save_output(self, result):
         output_id = uuid.uuid4().hex
@@ -551,7 +637,13 @@ class Agent:
     def confirm(self, action):
         if self.auto_approve:
             return True
-        return self.ui.confirm(action)
+        if action in self._declined_actions:
+            self.ui.notice("Already declined in this request; not asking again.", "warning")
+            return False
+        approved = self.ui.confirm(action)
+        if not approved:
+            self._declined_actions.add(action)
+        return approved
 
 
 # ---- local system ----------------------------------------------------------
@@ -717,14 +809,33 @@ def system_facts():
 # ---- model output helpers ------------------------------------------------
 
 class LiveText:
-    """Prints streamed model text, hiding <think> blocks and tool-call markup like strip_thinking does."""
+    """Display inline thinking separately from the answer; hide tool-call markup."""
     TAGS = ("<think>", "</think>", "<tool_call>", "<function=")
 
     def __init__(self, ui=None):
         self.ui = ui
         self.text = ""
         self.shown = 0
+        self.thinking_shown = 0
+        self.thinking_closed = False
         self.bold = False
+
+    def show_thinking(self, final=False):
+        if self.ui is None or self.thinking_closed or "<think>" not in self.text:
+            return
+        body = self.text.split("<think>", 1)[1]
+        closed = "</think>" in body
+        body = body.split("</think>", 1)[0]
+        if not closed and not final:
+            cut = body.rfind("<")
+            if cut >= 0 and "</think>".startswith(body[cut:]):
+                body = body[:cut]
+        if len(body) > self.thinking_shown:
+            self.ui.write_thinking(body[self.thinking_shown:])
+            self.thinking_shown = len(body)
+        if closed:
+            self.ui.end_thinking()
+            self.thinking_closed = True
 
     def visible(self, final=False):
         t = self.text
@@ -745,6 +856,7 @@ class LiveText:
 
     def feed(self, piece):
         self.text += piece
+        self.show_thinking()
         self.show(self.visible())
 
     def show(self, v):
@@ -757,6 +869,9 @@ class LiveText:
             self.shown = len(v)
 
     def finish(self, final=True):
+        self.show_thinking(final=final)
+        if self.ui:
+            self.ui.end_thinking()
         self.show(self.visible(final=final).rstrip())
         if self.ui:
             self.ui.end_response()
@@ -953,7 +1068,7 @@ def main(argv=None):
     p.add_argument("--top-p", type=float, help="nucleus sampling (default: 0.95 with thinking, otherwise 0.9)")
     thinking = p.add_mutually_exclusive_group()
     thinking.add_argument("--think", dest="think", action="store_true", default=True,
-                          help="enable model thinking with a spinner (default; slower)")
+                          help="enable and display model thinking (default; slower)")
     thinking.add_argument("--no-think", dest="think", action="store_false",
                           help="disable model thinking for faster answers")
     p.add_argument("--notes", help="notes folder (default: the notes folder next to agent.py)")
@@ -963,7 +1078,11 @@ def main(argv=None):
     p.add_argument("--max-steps", type=int, default=MAX_STEPS, help="maximum model/tool rounds per task (1-200)")
     p.add_argument("--deployment-timeout", type=int, default=3600, help="copy/installer monitoring timeout in seconds (60-86400)")
     p.add_argument("--plain", action="store_true", help="plain terminal output without colour or animation")
-    p.add_argument("--verbose", action="store_true", help="show complete tool results")
+    detail = p.add_mutually_exclusive_group()
+    detail.add_argument("--verbose", dest="verbose", action="store_true", default=True,
+                        help="show full returned tool results (default)")
+    detail.add_argument("--compact", dest="verbose", action="store_false",
+                        help="summarize tool results; thinking remains visible")
     p.add_argument("--no-web", action="store_true", help="disable public web search and page reading")
     a = p.parse_args(argv)
     ui = TerminalUI(plain=a.plain, verbose=a.verbose)

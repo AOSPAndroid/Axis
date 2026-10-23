@@ -77,6 +77,22 @@ class TerminalUITests(unittest.TestCase):
         self.assertNotIn("LOCAL INTELLIGENCE", stream.getvalue())
         self.assertNotIn("REAL ACTIONS", stream.getvalue())
 
+    def test_thinking_is_visible_in_normal_verbose_and_plain_output(self):
+        for plain, verbose in ((False, False), (False, True), (True, False)):
+            with self.subTest(plain=plain, verbose=verbose):
+                stream = io.StringIO()
+                ui = TerminalUI(stream=stream, plain=plain, verbose=verbose)
+                ui.write_thinking("The package and target are known. ")
+                ui.write_thinking("Proceed to the requested action.")
+                ui.assistant("Ready to deploy.")
+                output = stream.getvalue()
+                self.assertIn("The package and target are known. Proceed to the requested action.", output)
+                self.assertIn("Ready to deploy.", output)
+                self.assertLess(output.index("Proceed to"), output.index("Ready to deploy"))
+                self.assertEqual(output.count("Thinking"), 1)
+                self.assertFalse(ui._thinking_open)
+                self.assertIsNone(ui._activity)
+
     def test_job_state_never_implies_verified_installation(self):
         stream = io.StringIO()
         ui = TerminalUI(stream=stream, plain=True, width=90)

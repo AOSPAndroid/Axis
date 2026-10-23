@@ -52,27 +52,34 @@ class AnimationTests(unittest.TestCase):
         self.assertIsNone(ui._activity)
 
     def test_pending_text_flushes_even_when_the_model_pauses(self):
-        stream = TTY()
-        ui = animated_ui(stream)
-        try:
-            ui.write_response("First fragment ")
-            ui.write_response("pending-tail")
-            self.assertTrue(stream.tail_seen.wait(1.0), "Buffered text was stranded during a network pause")
-        finally:
-            ui.end_response()
-        self.assertIsNone(ui._activity)
+        for thinking in (False, True):
+            with self.subTest(thinking=thinking):
+                stream = TTY()
+                ui = animated_ui(stream)
+                write = ui.write_thinking if thinking else ui.write_response
+                try:
+                    write("First fragment ")
+                    write("pending-tail")
+                    self.assertTrue(stream.tail_seen.wait(1.0), "Buffered text was stranded during a network pause")
+                finally:
+                    ui.end_thinking()
+                    ui.end_response()
+                self.assertIsNone(ui._activity)
 
     def test_approval_stops_stream_worker_and_flushes_tail_before_input(self):
-        stream = TTY()
-        observed = []
-        ui = animated_ui(stream, input_fn=lambda _: observed.append(
-            (ui._activity, "pending-tail" in stream.getvalue())) or "n")
-        ui.write_response("First ")
-        worker = ui._activity.thread
-        ui.write_response("pending-tail")
-        self.assertFalse(ui.confirm("Restart LAB-PC-042"))
-        self.assertEqual(observed, [(None, True)])
-        self.assertFalse(worker.is_alive())
+        for thinking in (False, True):
+            with self.subTest(thinking=thinking):
+                stream = TTY()
+                observed = []
+                ui = animated_ui(stream, input_fn=lambda _: observed.append(
+                    (ui._activity, "pending-tail" in stream.getvalue())) or "n")
+                write = ui.write_thinking if thinking else ui.write_response
+                write("First ")
+                worker = ui._activity.thread
+                write("pending-tail")
+                self.assertFalse(ui.confirm("Restart LAB-PC-042"))
+                self.assertEqual(observed, [(None, True)])
+                self.assertFalse(worker.is_alive())
 
     def test_plain_no_color_and_dumb_terminals_have_no_motion_or_delay(self):
         for options, env in (({"plain": True}, {}), ({}, {"NO_COLOR": "1"}), ({}, {"TERM": "dumb"})):

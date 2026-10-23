@@ -107,7 +107,7 @@ class TUIIntegrationTests(unittest.TestCase):
             self.agent.read_stream(iter([event({"content": "Partial answer"})]))
         self.ui.end_response.assert_called()
 
-    def test_stream_interruption_closes_response_without_showing_reasoning(self):
+    def test_stream_interruption_flushes_reasoning_and_closes_display(self):
         def interrupted():
             yield event({"reasoning_content": "Considering the current state"})
             raise KeyboardInterrupt()
@@ -115,9 +115,11 @@ class TUIIntegrationTests(unittest.TestCase):
         with self.assertRaises(KeyboardInterrupt):
             self.agent.read_stream(interrupted())
         self.ui.end_response.assert_called()
+        self.ui.end_thinking.assert_called()
+        self.ui.write_thinking.assert_called_once_with("Considering the current state")
         self.ui.write_response.assert_not_called()
 
-    def test_reasoning_stays_hidden_while_spinner_runs_until_answer(self):
+    def test_reasoning_is_displayed_but_not_fed_back_into_history(self):
         class TTY(io.StringIO):
             def isatty(self):
                 return True
@@ -133,14 +135,13 @@ class TUIIntegrationTests(unittest.TestCase):
 
                 def model_stream():
                     worker = ui._activity.thread
-                    yield event({"reasoning_content": "Hidden deliberation"})
-                    self.assertIs(ui._activity.thread, worker)
-                    self.assertTrue(worker.is_alive())
-                    self.assertNotIn("Hidden deliberation", stream.getvalue())
-                    # Inline thinking from other compatible server templates is hidden too.
-                    for piece in ("<thi", "nk>Hidden inline reasoning", "</think>", "Ready."):
-                        yield event({"content": piece})
+                    yield event({"reasoning_content": "Visible deliberation"})
                     self.assertFalse(worker.is_alive())
+                    self.assertIn("Visible deliberation", stream.getvalue())
+                    # Inline thinking from other server templates is displayed too,
+                    # even with tags split across chunks.
+                    for piece in ("<thi", "nk>Visible inline reasoning", "</thi", "nk>", "Ready", "."):
+                        yield event({"content": piece})
                     yield event(finish_reason="stop")
 
                 self.agent.chat = Mock(side_effect=lambda: self.agent.read_stream(model_stream()))
@@ -148,10 +149,13 @@ class TUIIntegrationTests(unittest.TestCase):
                 self.assertIsNone(ui._activity)
                 output = terminal_ui.clean_text(stream.getvalue())
                 self.assertIn("Ready.", output)
-                self.assertNotIn("Hidden", output)
-                self.assertNotIn("Hidden", json.dumps(self.agent.messages))
+                self.assertEqual(output.count("Visible deliberation"), 1)
+                self.assertEqual(output.count("Visible inline reasoning"), 1)
+                self.assertNotIn("<think>", output)
+                self.assertNotIn("</think>", output)
+                self.assertNotIn("Visible", json.dumps(self.agent.messages))
 
-    def test_reasoning_only_spinner_clears_on_interruption_and_output_limit(self):
+    def test_reasoning_display_clears_on_interruption_and_output_limit(self):
         class TTY(io.StringIO):
             def isatty(self):
                 return True
@@ -168,7 +172,8 @@ class TUIIntegrationTests(unittest.TestCase):
 
                 def model_stream():
                     workers.append(ui._activity.thread)
-                    yield event({"reasoning_content": "Hidden deliberation"})
+                    yield event({"reasoning_content": "Visible deliberation"})
+                    workers.append(ui._activity.thread)
                     if failure is KeyboardInterrupt:
                         raise KeyboardInterrupt()
                     yield event(finish_reason="length")
@@ -177,8 +182,23 @@ class TUIIntegrationTests(unittest.TestCase):
                 with self.assertRaises(failure):
                     self.agent.run("Check status")
                 self.assertIsNone(ui._activity)
-                self.assertFalse(workers[0].is_alive())
-                self.assertNotIn("Hidden deliberation", stream.getvalue())
+                self.assertTrue(all(not worker.is_alive() for worker in workers))
+                self.assertIn("Visible deliberation", stream.getvalue())
+
+    def test_non_streaming_response_displays_thinking_and_answer_once(self):
+        stream = io.StringIO()
+        self.agent.ui = terminal_ui.TerminalUI(stream=stream, plain=True)
+        response = MagicMock()
+        response.headers = {"Content-Type": "application/json"}
+        response.read.return_value = json.dumps({"choices": [{"finish_reason": "stop", "message": {
+            "role": "assistant", "reasoning_content": "Visible deliberation", "content": "Ready."}}]}).encode()
+        with patch.object(self.agent.http, "open") as opened:
+            opened.return_value.__enter__.return_value = response
+            self.assertEqual(self.agent.run("Check status"), "Ready.")
+        self.assertTrue(self.agent.answer_shown)
+        self.assertEqual(stream.getvalue().count("Visible deliberation"), 1)
+        self.assertEqual(stream.getvalue().count("Ready."), 1)
+        self.assertNotIn("Visible deliberation", json.dumps(self.agent.messages))
 
     def test_fragmented_tool_arguments_are_assembled_before_dispatch(self):
         stream = [

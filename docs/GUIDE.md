@@ -6,7 +6,7 @@ The workflow screenshots use scripted model replies and sample PC names, people 
 
 ![Current Axis ASCII interface](images/06-ascii-ui.png)
 
-The startup logo reveals briefly, and a small ASCII spinner rotates while the model loads or a request runs. Animations stop before input and approval prompts. Reasoning text stays hidden and answers stream in short batches, with labelled tool results kept in normal scrollback. Loading indicators show elapsed time; deployment panels show recorded events and refresh with `/jobs ID`. Colours follow your terminal capabilities and background theme.
+The startup logo reveals briefly, and a small ASCII spinner rotates while the model loads or a request runs. Animations stop before input and approval prompts. Thinking and answers are displayed separately in short batches, with labelled tool results kept in normal scrollback. Loading indicators show elapsed time; deployment panels show recorded events and refresh with `/jobs ID`. Colours follow your terminal capabilities and background theme.
 
 For a compact display, launch `Start Agent.bat --plain`. This disables the logo, colour and motion in startup and chat. `NO_COLOR`, `TERM=dumb` and redirected output also disable colour and motion. The interface adds no third-party Python dependencies.
 
@@ -117,6 +117,8 @@ Good to know:
 - Structured service/process tools enforce protected targets and recheck identity against a recent inspection. General shell commands run with your Windows account's rights.
 - Ctrl+C cancels the current chat request. Accepted background deployment/reboot jobs continue; inspect their status before retrying an uncertain operation.
 
+Axis reuses repeated note/package lookups within a request and stops a continuing identical lookup loop. It still checks live machine state and job progress. Declining an action prevents the same approval prompt appearing again in that request. A new request starts fresh.
+
 ### Commands
 
 | Command | What it does |
@@ -173,7 +175,7 @@ Keep notes to procedures and environment facts, not staff or directory data.
 
 ## Thinking mode
 
-Thinking remains enabled by default. Double-click `Start Agent.bat` normally: a small rotating spinner shows activity while the model thinks, then the answer appears. Reasoning text stays out of the chat. Tool results stay compact; `--verbose` expands tool results without exposing reasoning.
+Thinking is enabled and displayed by default. Double-click `Start Agent.bat` normally: the model’s thinking appears under a Thinking heading, followed by its answer. A small spinner shows activity while waiting for output. Tool results are expanded by default. Use `--compact` for shorter summaries; thinking remains visible.
 
 For faster answers without thinking, run:
 
@@ -190,9 +192,10 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | Option | What it does |
 | --- | --- |
 | `--model KEY` | Use this model without asking (see [model keys](#choosing-a-model)). |
-| `--think` | Enable model reasoning, shown as a spinner. This is the default. |
+| `--think` | Enable and display model reasoning. This is the default. |
 | `--no-think` | Disable thinking for faster answers. |
-| `--verbose` | Expand tool results; reasoning text stays hidden. |
+| `--verbose` | Expand returned tool results (default); thinking is already displayed. |
+| `--compact` | Use shorter tool summaries; thinking remains visible. |
 | `--plain` | Use compact headings without the logo, colour or animation in startup and chat. `NO_COLOR` also disables colour and animation. |
 | `--no-web` | Disable public web search and page reads. |
 | `--cpu` | Use only the processor, even if a graphics card is found. |

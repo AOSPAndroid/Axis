@@ -17,8 +17,9 @@ Narrow terminals and --plain use a compact AXIS heading.
 /status shows settings; /output reads saved tool results; /paste enters a
 multiline request (finish with a single . line). Ctrl+C cancels the current
 request and returns to the prompt. /exit closes the chat. Accepted background
-IT jobs continue. Thinking is enabled by default and shown as a spinner. --plain disables
-colour/animation in startup and chat; --verbose expands tool output.
+IT jobs continue. Thinking is enabled and displayed by default. --plain disables
+colour/animation in startup and chat. Tool output is expanded by default;
+--compact uses shorter tool summaries while keeping thinking visible.
 Run "Start Agent.bat --plain" for the compact display. NO_COLOR, TERM=dumb
 and redirected output also disable colour and animation.
 
@@ -109,7 +110,7 @@ files in the "notes" folder. The agent searches them before guessing, and
 always reads notes\ALWAYS.md (keep it short). notes\EXAMPLE.md shows the
 format. Re-extracting the zip only replaces EXAMPLE.md.
 
-The model's thinking stays out of the chat; a small spinner shows activity.
+The model's thinking is displayed as it arrives, followed by its answer.
 Just double-click "Start Agent.bat". For faster answers without thinking,
 start with: "Start Agent.bat" --no-think
 Restart an existing model server if it was started with thinking disabled.

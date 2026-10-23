@@ -136,11 +136,15 @@ class TerminalUI:
         self._lock = threading.RLock()
         self._activity = None
         self._response_open = False
+        self._thinking_open = False
         self._response_bold = False
         self._pending_star = ""
         self._response_buffer = []
+        self._thinking_buffer = []
         self._response_size = 0
+        self._thinking_size = 0
         self._response_flushed = 0
+        self._thinking_flushed = 0
         self._intro_shown = False
 
     @property
@@ -182,6 +186,7 @@ class TerminalUI:
     def _prepare(self, close_streams=True):
         self._stop_activity()
         if close_streams:
+            self.end_thinking()
             self.end_response()
 
     def _line(self, value="", tone=None, prefix="", bold=False):
@@ -314,6 +319,7 @@ class TerminalUI:
                 with self._lock:
                     if activity.stop.is_set():
                         break
+                    self._flush_thinking()
                     self._flush_response()
 
         activity.thread = threading.Thread(target=flush, name="local-agent-stream", daemon=True)
@@ -329,6 +335,7 @@ class TerminalUI:
         if self._response_open:
             return
         self._stop_activity()
+        self.end_thinking()
         with self._lock:
             if not self._response_open:
                 self._line()
@@ -380,6 +387,44 @@ class TerminalUI:
                 self._response_bold = False
                 self._pending_star = ""
                 self._response_flushed = 0
+
+    def begin_thinking(self):
+        if self._thinking_open:
+            return
+        self._stop_activity()
+        self.end_response()
+        with self._lock:
+            if not self._thinking_open:
+                self._heading("Thinking", tone="dim")
+                self._thinking_open = True
+                self._start_stream_flush()
+
+    def write_thinking(self, text):
+        if not text:
+            return
+        self.begin_thinking()
+        with self._lock:
+            self._thinking_buffer.append(text)
+            self._thinking_size += len(text)
+            if (not self.animated or self._thinking_size >= STREAM_BUFFER_LIMIT or
+                    time.monotonic() - self._thinking_flushed >= FRAME_INTERVAL):
+                self._flush_thinking()
+
+    def _flush_thinking(self):
+        if self._thinking_buffer:
+            self._raw(self._style(clean_text("".join(self._thinking_buffer)), "dim"))
+            self._thinking_buffer.clear()
+            self._thinking_size = 0
+            self._thinking_flushed = time.monotonic()
+
+    def end_thinking(self):
+        self._stop_activity()
+        with self._lock:
+            if self._thinking_open:
+                self._flush_thinking()
+                self._raw("\n")
+                self._thinking_open = False
+                self._thinking_flushed = 0
 
     def _activity_frame(self, label, tick, elapsed):
         seconds = int(max(0, elapsed))

@@ -8,7 +8,7 @@ It needs Python 3.8 or newer and nothing else.
 
 ## Terminal interface
 
-The console opens with an AXIS ASCII logo, the active model, context, thinking/approval mode, workspace and package repository. Narrow terminals and `--plain` use a compact AXIS heading. Responses appear under AXIS with clearly labelled tool activity; inspections and deployment results use compact tables. Web searches show titles, snippets and source URLs; page reads show an excerpt, links and the next text offset when more is available. During model/tool work an elapsed-time indicator runs in interactive terminals. Thinking remains enabled by default, with a small rotating spinner instead of reasoning text. Tool output stays compact; add `--verbose` to expand it, or `--no-think` to disable thinking for faster answers.
+The console opens with an AXIS ASCII logo, the active model, context, thinking/approval mode, workspace and package repository. Narrow terminals and `--plain` use a compact AXIS heading. Responses appear under AXIS with clearly labelled tool activity; inspections and deployment results use compact tables. Web searches show titles, snippets and source URLs; page reads show an excerpt, links and the next text offset when more is available. During model/tool work an elapsed-time indicator runs in interactive terminals. Thinking is enabled and displayed by default, separately from the final answer. A simple spinner shows activity while waiting for output. Tool output is expanded by default; use `--compact` for summaries, or `--no-think` to disable thinking for faster answers.
 
 The interface uses only the standard library and keeps normal terminal scrollback. Its ASCII layout adapts to narrow windows. A simple spinner animates at eight frames per second; streamed text is buffered for up to about 125 ms or 1,024 characters between flushes. Display workers stop before prompts and approvals and when work ends. The startup logo reveal adds about 150 ms. Model loading shows activity and elapsed time because the server supplies no reliable percentage. Deployment logs show recorded events; `/jobs ID` refreshes background progress.
 
@@ -157,7 +157,7 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--workdir` | current folder | The only folder the file tools may use |
 | `--ctx` | `16384` | Must match the server's `-c`; older history is compacted to fit |
 | `--yes` | off | Approve writes and commands without asking |
-| `--think` | on | Enable model thinking, shown as a spinner; slower and uses more context |
+| `--think` | on | Enable and display model thinking; slower and uses more context |
 | `--no-think` | off | Disable thinking for faster answers |
 | `--temperature`, `--top-p` | 0.6 and 0.95 with thinking; 0.3 and 0.9 without | Sampling overrides; the launcher uses model-specific defaults when present |
 | `--no-web` | off | Disable public web search and page reading |
@@ -166,13 +166,17 @@ python agent.py --workdir C:\path\to\project "list the .ps1 files and say what e
 | `--max-steps` | `30` | Maximum model/tool rounds per request (1–200) |
 | `--deployment-timeout` | `3600` | Copy/installer monitoring timeout in seconds (60–86400) |
 | `--plain` | off | Disable colours and animation |
-| `--verbose` | off | Show full tool output; reasoning text stays hidden |
+| `--verbose` | on | Expand returned tool output; thinking is already displayed |
+| `--compact` | off | Summarize tool results; thinking stays visible |
 
 ## Your notes
 
 Put runbooks, procedures, known fixes and names as `.md` or `.txt` files in the `notes` folder next to `agent.py` (or pass `--notes DIR`). The agent sees the list of files, searches them with `search_notes` before guessing, and opens one with `read_note`. `notes/ALWAYS.md` is loaded into every conversation, so keep it short. `notes/EXAMPLE.md` shows the format.
 
-The model's reasoning is enabled by default but stays out of the chat; a spinner shows activity until the answer arrives. `--no-think` disables thinking. If a reused model server was started with thinking disabled, restart it to apply the new default.
+The model's reasoning is enabled and displayed by default, including separate reasoning fields and inline think blocks from compatible servers. Reasoning is displayed but excluded from conversation history sent back to the model. `--no-think` disables thinking. If a reused model server was started with thinking disabled, restart it to apply the new default.
+
+
+Repeated reference lookups are guarded within each request: an identical notes, package or saved-output lookup reuses its result once, and another repeat stops the loop. A new request or potentially modifying tool call clears those results. Machine inspections and job polling stay fresh. A declined action is not prompted again within the same request; approval is never reused to silently repeat a change. This guard detects repeated tool requests, not repetition entirely inside the model's reasoning.
 
 ## Notes
 
