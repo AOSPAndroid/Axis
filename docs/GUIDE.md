@@ -48,7 +48,7 @@ Changes ask for approval by default. `--yes` automatically approves actions for 
 ## What you need
 
 - Windows 10 or 11
-- Python 3.8 or newer. Axis finds it on the PATH, in `C:\devhome\tools\python3*\current`, or in your user's Python install folder.
+- Python 3.8 or newer. Axis first checks the standard installation at `C:\devhome\tools\python3.12\current\python.exe`. If absent, it checks the Python launcher, PATH, other `C:\devhome\tools\python3*\current` folders and your user's Python install folder. No PATH change is needed for the standard installation.
 - RAM for the model: 32 GB or more for the large models, 16 GB for a 9B model
 - free disk space: the model's size plus about 2 GB while its parts are joined
 - optional: a graphics card with 4 GB or more of memory, which Axis uses automatically

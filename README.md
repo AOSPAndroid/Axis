@@ -13,7 +13,7 @@ Actual terminal renderer with scripted example data. Axis has an ASCII logo, col
 ## Quick start
 
 1. Download **[local-agent-windows.zip](https://github.com/AOSPAndroid/Axis/releases/download/local-agent-windows/local-agent-windows.zip)** and extract it.
-2. Copy your full **`Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`** into the `local-agent` folder beside **`Start Agent.bat`**. Python 3.8 or newer must already be installed.
+2. Copy your full **`Qwen3.6-35B-A3B-UD-Q4_K_M.gguf`** into the `local-agent` folder beside **`Start Agent.bat`**. The launcher uses the existing Python at `C:\devhome\tools\python3.12\current\python.exe` first, with automatic discovery elsewhere if needed (Python 3.8 or newer).
 3. Double-click **`Start Agent.bat`**, wait for the AXIS banner and `You >` prompt, then type a request.
 
 If you need a model, download all parts from its [release page](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m). The launcher can check and join them. Read the **[full guide](docs/GUIDE.md)** for models, options, notes and troubleshooting.

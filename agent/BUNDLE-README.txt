@@ -62,7 +62,10 @@ run commands or change the agent's behaviour. Add --no-web to disable web
 tools; local chat, notes, files and IT tools remain available.
 
 1. Extract local-agent-windows.zip anywhere, for example Documents.
-   Python 3.8 or newer must already be installed on the PC.
+   The launcher first uses the existing Python installation at:
+     C:\devhome\tools\python3.12\current\python.exe
+   No PATH change is needed. If absent, it searches other installed Python
+   locations (Python 3.8 or newer).
 
 2. If you already have the FULL model, copy this file into the extracted
    local-agent folder beside "Start Agent.bat":
