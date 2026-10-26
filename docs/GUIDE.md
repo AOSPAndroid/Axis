@@ -19,6 +19,7 @@ On Windows, use Windows Terminal to see the role icons. For a compact display, l
 - [Atlas database](#atlas-database)
 - [Public web research](#public-web-research)
 - [Your notes](#your-notes)
+- [Skills](#skills)
 - [Thinking mode](#thinking-mode)
 - [Options](#options)
 - [Troubleshooting](#troubleshooting)
@@ -157,6 +158,7 @@ Axis reuses repeated note/package lookups within a request and stops a continuin
 | `/status` | Shows model, workspace and session settings. |
 | `/jobs [ID]` | Checks deployment/reboot progress without using the model. |
 | `/output [ID] [offset]` | Reads full saved tool output in pages. |
+| `/skills [name]` | Lists workflow guides or shows one. |
 | `/history` | Shows recent requests from this session. |
 | `/paste` | Enters multiple lines; a single `.` line submits them. |
 | `/clear` | Redraws the AXIS banner. |
@@ -203,6 +205,14 @@ Put your runbooks, procedures, known fixes and environment facts in the `notes` 
 
 Keep notes to procedures and environment facts, not staff or directory data.
 
+## Skills
+
+Skills are step-by-step workflow guides Axis follows for common jobs: finding people and PCs in Atlas, PC health checks, slow-PC triage, package deployments, services and processes, AD access, job recovery and drafting runbooks. Axis reads the matching guide before it starts; you can also ask, for example, "Use pc-health on PC-0142".
+
+- `/skills` lists them; `/skills pc-health` shows one guide.
+- A skill never runs anything by itself and never skips an approval.
+- To add your own, create `state\skills\<name>\SKILL.md` inside `local-agent` with a `name` and `description` at the top (see `skills\pc-health\SKILL.md` for the format), then type `/reset`. Updating Axis replaces only the bundled `skills` folder, never `state\skills`.
+
 ## Thinking mode
 
 Thinking is enabled and displayed by default. Double-click `Start Agent.bat` normally: the model’s thinking appears under a Thinking heading, followed by its answer. A small spinner shows activity while waiting for output. Tool results are expanded by default. Use `--compact` for shorter summaries; thinking remains visible.
@@ -234,6 +244,7 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | `--temperature`, `--top-p` | Override the model's sampling defaults. |
 | `--workdir FOLDER` | The folder Axis may read and write files in. Default: `workspace` next to `start.py`. |
 | `--notes FOLDER` | Use a different notes folder. |
+| `--skills FOLDER` | Use a different folder for your own skills. Default: `state\skills`. |
 | `--atlas-db PATH` | Read people and computer inventory from this existing Atlas database. |
 | `--with-atlas` | Start the installed Atlas before Axis and use its active database. Included by `Start Axis + Atlas.bat`. |
 | `--atlas-dir FOLDER` | Choose the Atlas installation for the shared launcher. |

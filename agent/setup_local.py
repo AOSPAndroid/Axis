@@ -227,10 +227,16 @@ def setup_llama(root, gpu):
 
 # ---- agent and launchers -----------------------------------------------------
 
+SKILLS = ("ad-access", "atlas-directory", "atlas-knowledge", "job-recovery", "package-deployment",
+          "pc-health", "performance-triage", "service-process")
+
+
 def setup_agent(root):
-    for name in ("agent.py", "it_tools.py", "it_windows.ps1", "terminal_ui.py", "web_tools.py", "atlas_db.py"):
+    names = ("agent.py", "it_tools.py", "it_windows.ps1", "terminal_ui.py", "web_tools.py", "atlas_db.py", "skill_library.py")
+    for name in names + tuple("skills/%s/SKILL.md" % skill for skill in SKILLS):
         here = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
         dest = os.path.join(root, name)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
         if os.path.exists(here):
             if os.path.abspath(here) != os.path.abspath(dest):
                 shutil.copyfile(here, dest)

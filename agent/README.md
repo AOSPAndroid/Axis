@@ -24,6 +24,7 @@ In a synthetic Linux rendering check, 10,000 five-character fragments required 5
 | `/status` | View model/server, context, paths and session settings |
 | `/jobs` / `/jobs ID` | Read deployment/reboot jobs directly, without asking the model |
 | `/output` / `/output ID offset` | Read the latest or selected saved tool result in character pages |
+| `/skills` / `/skills NAME` | List workflow guides or read one, without asking the model |
 | `/history` | Show recent requests from this session |
 | `/paste` | Enter a multiline request; submit with a single `.` line |
 | `/reset` | Clear model conversation; retain jobs and saved output |
@@ -54,7 +55,7 @@ The basic fallback reads public HTML/text only. Neither provider signs into webs
 
 ## Standalone Windows IT actions
 
-Keep `agent.py`, `it_tools.py`, `it_windows.ps1`, `terminal_ui.py`, `web_tools.py` and `atlas_db.py` together. Both setup and the Windows bundle include them. To update an existing bundle, replace these files plus `start.py`; keep your models, notes, database and `state` folder.
+Keep `agent.py`, `it_tools.py`, `it_windows.ps1`, `terminal_ui.py`, `web_tools.py`, `atlas_db.py`, `skill_library.py` and the `skills` folder together. Both setup and the Windows bundle include them. To update an existing bundle, replace these files plus `start.py`; keep your models, notes, database and `state` folder.
 
 Start normally; the pictured OneDrive package repository is already the default:
 
@@ -200,6 +201,23 @@ Put runbooks, procedures, known fixes and names as `.md` or `.txt` files in the 
 
 The model's reasoning is enabled and displayed by default, including separate reasoning fields and inline think blocks from compatible servers. Reasoning is displayed but excluded from conversation history sent back to the model. `--no-think` disables thinking. If a reused model server was started with thinking disabled, restart it to apply the new default.
 
+
+## Skills
+
+Skills are reusable workflow guides in `skills/<name>/SKILL.md`. Axis sees only each guide's name and description, reads the matching guide with `read_skill` before following it, and leaves the others out of the conversation. Eight are bundled: `atlas-directory`, `pc-health`, `performance-triage`, `package-deployment`, `service-process`, `ad-access`, `job-recovery` and `atlas-knowledge`. Atlas guides need the Atlas database; Windows tools need Windows. `/skills` lists them with any skipped files; `/skills pc-health` prints one.
+
+Reading a skill never runs code or starts an operation, and a guide cannot grant permission: approvals, per-PC job locks, privacy and verification rules still apply. Add your own guides in `state/skills/<name>/SKILL.md` (or `--skills DIR`); custom names cannot replace bundled ones. Front matter has exactly `name` (lowercase, hyphenated, matching the folder, at most 64 characters) and `description` (at most 160 characters); the body is at most 2,400 characters and the file 12,000 bytes. At most 24 guides load. Linked folders/files and other formats are skipped and reported by `/skills`. Use `/reset` after adding or renaming a guide so the model sees the new list.
+
+```markdown
+---
+name: printer-check
+description: Diagnose a stopped print spooler on an explicit Windows PC.
+---
+1. Resolve the exact Windows hostname. Ask if ambiguous.
+2. Use inspect_computer with view=services and query=Spooler.
+3. Restart only when asked, using computer_action and the returned snapshot.
+4. A running service does not prove printing works; ask for a test print when needed.
+```
 
 Repeated reference lookups are guarded within each request: an identical notes, package or saved-output lookup reuses its result once, and another repeat stops the loop. A new request or potentially modifying tool call clears those results. Machine inspections and job polling stay fresh. A declined action is not prompted again within the same request; approval is never reused to silently repeat a change. This guard detects repeated tool requests, not repetition entirely inside the model's reasoning.
 

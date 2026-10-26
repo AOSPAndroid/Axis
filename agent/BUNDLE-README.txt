@@ -44,7 +44,8 @@ text labels remain in all modes.
 Approvals are amber, errors red and successful tool results green.
 Narrow terminals and --plain use a compact AXIS heading.
 /help lists commands. /jobs checks deployments without using the model;
-/status shows settings; /output reads saved tool results; /paste enters a
+/status shows settings; /skills lists workflow guides (/skills NAME shows one);
+/output reads saved tool results; /paste enters a
 multiline request (finish with a single . line). Ctrl+C cancels the current
 request and returns to the prompt. /exit closes the chat. Accepted background
 IT jobs continue. Thinking is enabled and displayed by default. --plain disables
