@@ -187,6 +187,8 @@ Axis discovers packages from the preconfigured repository and performs install, 
 
 Ask Axis to find the package, then give it the exact target PC names and desired action. A single matching package includes its action scripts in one lookup; several versions still require a choice. It shows an approval before starting. An accepted job ID means queued; `/jobs` tracks each target and `/output` exposes full logs and results. Jobs persist in the `state` folder next to the agent.
 
+Some install scripts start a setup program and return straight away. Axis keeps waiting until everything the script started, and Windows Installer, has finished, so a job that says it finished really has. `/jobs ID` shows what it is waiting for, then lists the software that was newly registered, removed or updated.
+
 If monitoring is lost, the result is `unknown`. Inspect the target and logs before retrying. A successful installer exit still needs an application or vendor-specific health check.
 
 ## Public web research
