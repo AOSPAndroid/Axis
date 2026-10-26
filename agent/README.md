@@ -136,7 +136,7 @@ Extract the ZIP, then double-click `Start Agent.bat` inside its `local-agent` fo
 
 If you downloaded model parts instead, `start.py` checks and joins them, using about 2 GB of spare disk and resuming if interrupted. It starts llama-server and opens the agent. If several models are present it asks which to use. Add `--model 35b` to select the 35B or `--model 9b-distill` for the smaller distill.
 
-`--model flash` selects Qwen3.8-Flash-Next: all 36 download parts produce two GGUF files totalling 66.4 GB. Both files must be in the same folder. The launcher loads the first, and llama.cpp finds its companion. Model-specific server options enable memory mapping and lazy table reads. `--model k2` selects K2-Horizon-MoVA-36B-A4B. Model metadata may supply context, temperature and top-p defaults; explicit command-line values override them.
+`--model flash` selects Qwen3.8-Flash-Next: all 36 download parts produce two GGUF files totalling 66.4 GB. Both files must be in the same folder. The launcher loads the first, and llama.cpp finds its companion. Model-specific server options enable memory mapping and lazy table reads. `--model flash-abliterated` selects SC117's abliterated edit of the same build: only its first file (21 parts, 38.0 GB) is different. Its second file is byte-identical to Flash-Next's, so the model entry marks it `same_as` that file and the launcher links the existing copy (or joins Flash-Next's parts) under the name llama.cpp expects. `--model k2` selects K2-Horizon-MoVA-36B-A4B. Model metadata may supply context, temperature and top-p defaults; explicit command-line values override them.
 
 ## Quick setup (Windows)
 
