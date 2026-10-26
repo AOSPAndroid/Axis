@@ -53,8 +53,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp agent/agent.py agent/it_tools.py agent/it_windows.ps1 agent/terminal_ui.py agent/web_tools.py agent/atlas_db.py agent/launch_atlas.py agent/start.py agent/models.json "agent/Start Agent.bat" "agent/Start Axis + Atlas.bat" "agent/Configure Firecrawl.bat" bundle/local-agent/
+          cp agent/agent.py agent/it_tools.py agent/it_windows.ps1 agent/terminal_ui.py agent/web_tools.py agent/atlas_db.py agent/skill_library.py agent/launch_atlas.py agent/start.py agent/models.json "agent/Start Agent.bat" "agent/Start Axis + Atlas.bat" "agent/Configure Firecrawl.bat" bundle/local-agent/
           mkdir -p bundle/local-agent/notes && cp agent/notes/EXAMPLE.md bundle/local-agent/notes/
+          cp -r agent/skills bundle/local-agent/
           cp agent/BUNDLE-README.txt bundle/local-agent/README.txt
           echo "$GITHUB_SHA" > bundle/local-agent/BUNDLE-COMMIT.txt
           python - <<'PY'
@@ -74,17 +75,19 @@ jobs:
           import os
           from pathlib import Path
           import zipfile
-          modules = ('agent.py', 'it_tools.py', 'terminal_ui.py', 'web_tools.py', 'atlas_db.py', 'launch_atlas.py', 'start.py')
+          modules = ('agent.py', 'it_tools.py', 'terminal_ui.py', 'web_tools.py', 'atlas_db.py', 'skill_library.py', 'launch_atlas.py', 'start.py')
           with zipfile.ZipFile('local-agent-windows.zip') as archive:
               assert archive.testzip() is None, 'Corrupt ZIP member'
               names = archive.namelist()
-              required = modules + ('it_windows.ps1', 'models.json', 'Start Agent.bat', 'Start Axis + Atlas.bat', 'Configure Firecrawl.bat', 'README.txt', 'notes/EXAMPLE.md', 'BUNDLE-COMMIT.txt')
+              skills = tuple(str(path.relative_to('agent')).replace(os.sep, '/') for path in sorted(Path('agent/skills').glob('*/SKILL.md')))
+              assert skills, 'No bundled skills'
+              required = modules + skills + ('it_windows.ps1', 'models.json', 'Start Agent.bat', 'Start Axis + Atlas.bat', 'Configure Firecrawl.bat', 'README.txt', 'notes/EXAMPLE.md', 'BUNDLE-COMMIT.txt')
               for name in required:
                   data = archive.read('local-agent/' + name)
                   assert data, 'Empty bundle file: ' + name
                   if name in modules:
                       ast.parse(data.decode('utf-8'), feature_version=(3, 8))
-                  if name in modules + ('it_windows.ps1', 'models.json'):
+                  if name in modules + skills + ('it_windows.ps1', 'models.json'):
                       assert data == (Path('agent') / name).read_bytes(), 'Stale bundle file: ' + name
                   if name.endswith('.bat'):
                       source = (Path('agent') / name).read_bytes().replace(b'\r\n', b'\n')
@@ -95,7 +98,7 @@ jobs:
               assert not any(name.lower().endswith(('firecrawl.key', '.env')) for name in names), 'Credentials must remain outside the bundle'
               assert not any(name.lower().endswith(('.db', '.sqlite', '.sqlite3', '-wal', '-shm')) for name in names), 'Private databases must remain outside the bundle'
               assert archive.read('local-agent/BUNDLE-COMMIT.txt').decode().strip() == os.environ['GITHUB_SHA']
-          print('Verified all runtime modules, launchers, both llama.cpp builds and source commit.')
+          print('Verified all runtime modules, skills, launchers, both llama.cpp builds and source commit.')
           PY
 
       - name: Publish release

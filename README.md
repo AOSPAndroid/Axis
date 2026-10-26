@@ -40,6 +40,7 @@ The two workflow screenshots above show an earlier console with scripted replies
 - **Deploys packages** independently: install, uninstall, repair and copy-only workflows with persistent jobs and logs. `/jobs` checks progress.
 - **Researches the public web**: searches, reads pages and follows source links. Configure Firecrawl for JavaScript-rendered pages and public PDFs, with automatic fallback to the basic HTML/text reader. Requests use your Firecrawl allowance. Website logins and form submissions are not supported.
 - **Uses your notes**: runbooks and known fixes in the `notes` folder, searched before it guesses.
+- **Uses reusable skills**: `/skills` lists eight workflow guides; `/skills pc-health` reads one. Add custom guides in `state/skills` or select a folder with `--skills`.
 - **Shows its work**: labelled tool activity, result summaries, saved full output through `/output`, and a speed line after each answer.
 
 ## Models
@@ -48,6 +49,7 @@ The two workflow screenshots above show an earlier console with scripted replies
 | --- | --- | --- |
 | [Qwen3.6-35B-A3B](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-q4-k-m) | 22.1 GB | Everyday use: fast and good at terminal tasks. Recommended. |
 | [Qwen3.8-Flash-Next](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-flash-next-gsq-rco-q2-0) | 66.4 GB | Two GGUF files, 36 download parts. Uses memory mapping and reads its large table from disk on demand; performance depends on RAM, SSD and context. |
+| [Qwen3.8-Flash-Next abliterated](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-flash-next-gsq-rco-abliterated-q2-0) | 66.8 GB | Community variant; its second GGUF is identical to Flash's and can be reused. Select `--model flash-abliterated`. |
 | [K2-Horizon-MoVA-36B-A4B](https://github.com/AOSPAndroid/Axis/releases/tag/k2-horizon-mova-36b-a4b-q4-k-m) | 22.4 GB | An alternative reasoning model with its own sampling defaults. |
 | [Qwen3.8-27B](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-q4-k-m) | 16.5 GB | A dense model to compare on harder tasks; speed depends on hardware. |
 | [Gemma 4 26B-A4B](https://github.com/AOSPAndroid/Axis/releases/tag/gemma-4-26b-a4b-qat-q4-0) | 14.4 GB | An alternative from Google. |

@@ -19,6 +19,7 @@ On Windows, use Windows Terminal to see the role icons. For a compact display, l
 - [Atlas database](#atlas-database)
 - [Public web research](#public-web-research)
 - [Your notes](#your-notes)
+- [Skills](#skills)
 - [Thinking mode](#thinking-mode)
 - [Options](#options)
 - [Troubleshooting](#troubleshooting)
@@ -107,6 +108,7 @@ The connection is read-only and uses Python's built-in SQLite support. Atlas doe
 | `gemma` | Gemma 4 26B-A4B | [8 parts, 14.4 GB](https://github.com/AOSPAndroid/Axis/releases/tag/gemma-4-26b-a4b-qat-q4-0) | An alternative from Google. |
 | `9b-distill` | Qwen3.8-9B distill | [4 parts, 5.8 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-9b-q4-k-m) | A smaller community distillation. GPU fit also depends on context and runtime overhead. |
 | `35b-abliterated` | Qwen3.6-35B-A3B abliterated | [12 parts, 21.2 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-abliterated-q4-k-m) | Community edit with refusals removed. Not recommended on work PCs. |
+| `flash-abliterated` | Qwen3.8-Flash-Next abliterated | [21 parts, 38.0 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-flash-next-gsq-rco-abliterated-q2-0) | Flash-Next with refusals removed, same speed. Uses the second file from Qwen3.8-Flash-Next, so download that model's 16 `-00002-of-00002` parts too if you don't have it. Not recommended on work PCs. |
 | `9b-abliterated` | Qwen3.5-9B abliterated | [3 parts, 5.6 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.5-9b-abliterated-q4-k-m) | Same, smaller. Not recommended on work PCs. |
 
 To skip the menu, start Axis from a terminal in the `local-agent` folder with a model key:
@@ -157,6 +159,7 @@ Axis reuses repeated note/package lookups within a request and stops a continuin
 | `/status` | Shows model, workspace and session settings. |
 | `/jobs [ID]` | Checks deployment/reboot progress without using the model. |
 | `/output [ID] [offset]` | Reads full saved tool output in pages. |
+| `/skills [name]` | Lists workflow guides or shows one. |
 | `/history` | Shows recent requests from this session. |
 | `/paste` | Enters multiple lines; a single `.` line submits them. |
 | `/clear` | Redraws the AXIS banner. |
@@ -203,6 +206,14 @@ Put your runbooks, procedures, known fixes and environment facts in the `notes` 
 
 Keep notes to procedures and environment facts, not staff or directory data.
 
+## Skills
+
+Skills are step-by-step workflow guides Axis follows for common jobs: finding people and PCs in Atlas, PC health checks, slow-PC triage, package deployments, services and processes, AD access, job recovery and drafting runbooks. Axis reads the matching guide before it starts; you can also ask, for example, "Use pc-health on PC-0142".
+
+- `/skills` lists them; `/skills pc-health` shows one guide.
+- A skill never runs anything by itself and never skips an approval.
+- To add your own, create `state\skills\<name>\SKILL.md` inside `local-agent` with a `name` and `description` at the top (see `skills\pc-health\SKILL.md` for the format), then type `/reset`. Updating Axis replaces only the bundled `skills` folder, never `state\skills`.
+
 ## Thinking mode
 
 Thinking is enabled and displayed by default. Double-click `Start Agent.bat` normally: the model’s thinking appears under a Thinking heading, followed by its answer. A small spinner shows activity while waiting for output. Tool results are expanded by default. Use `--compact` for shorter summaries; thinking remains visible.
@@ -234,6 +245,7 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | `--temperature`, `--top-p` | Override the model's sampling defaults. |
 | `--workdir FOLDER` | The folder Axis may read and write files in. Default: `workspace` next to `start.py`. |
 | `--notes FOLDER` | Use a different notes folder. |
+| `--skills FOLDER` | Use a different folder for your own skills. Default: `state\skills`. |
 | `--atlas-db PATH` | Read people and computer inventory from this existing Atlas database. |
 | `--with-atlas` | Start the installed Atlas before Axis and use its active database. Included by `Start Axis + Atlas.bat`. |
 | `--atlas-dir FOLDER` | Choose the Atlas installation for the shared launcher. |
