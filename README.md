@@ -53,6 +53,9 @@ The two workflow screenshots above show an earlier console with scripted replies
 | [K2-Horizon-MoVA-36B-A4B](https://github.com/AOSPAndroid/Axis/releases/tag/k2-horizon-mova-36b-a4b-q4-k-m) | 22.4 GB | An alternative reasoning model with its own sampling defaults. |
 | [Qwen3.8-27B](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-q4-k-m) | 16.5 GB | A dense model to compare on harder tasks; speed depends on hardware. |
 | [Gemma 4 26B-A4B](https://github.com/AOSPAndroid/Axis/releases/tag/gemma-4-26b-a4b-qat-q4-0) | 14.4 GB | An alternative from Google. |
+| [Qwen3.8-35B-A3B distill](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-35b-a3b-distill-q4-k-m) | 21.7 GB | Community distill of Qwen3.8 into the fast 35B-A3B; always thinks. Select `--model 35b-distill`. |
+| [Qwen3.8-27B Q8_0](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-q8-0) / [BF16](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-bf16) | 29.0 / 54.7 GB | The 27B at 8-bit (near full quality) or its original 16-bit weights. Slow on a processor; Q8_0 needs 32 GB of RAM or more, BF16 64 GB or more. Select `--model 27b-q8` or `--model 27b-bf16`. |
+| [Qwen3.8-27B IQ3_S](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-gsq-rco-iq3-s) | 11.8 GB | The official 27B in a smaller GSQ-RCO build for 16 GB of memory. Select `--model 27b-iq3`. |
 
 The large models need 32 GB of RAM or more. A graphics card with 4 GB or more is used automatically. See the [guide](docs/GUIDE.md#choosing-a-model) for all models.
 
