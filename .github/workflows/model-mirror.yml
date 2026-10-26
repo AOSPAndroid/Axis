@@ -19,6 +19,39 @@ jobs:
       max-parallel: 2
       matrix:
         include:
+          - tag: qwen3.8-35b-a3b-distill-q4-k-m
+            title: Qwen3.8-35B-A3B Distill Q4_K_M (fast, community distill, 21.7 GB)
+            hf_repo: empero-ai/Qwen3.8-35B-A3B-Distill-GGUF
+            hf_rev: b1f9d1dcc3de8aa867669b0ab919384aeeb9b8d5
+            file: Qwen3.8-35B-A3B-Q4_K_M.gguf
+            size: '21713462944'
+            sha256: 196103269085bc54c9b8f49ed21e9f53e1b56b465e8b796c6d8e31e06f63cfa5
+            about: >-
+              Community model. Empero distilled Qwen3.8 reasoning traces into the Qwen3.6-35B-A3B
+              mixture-of-experts architecture (about 3B active per token); quantized by Empero. Not an
+              official Qwen release. It thinks before every answer.
+          - tag: qwen3.8-27b-gsq-rco-iq3-s
+            title: Qwen3.8-27B GSQ-RCO IQ3_S (smaller 27B, 11.8 GB)
+            hf_repo: ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF
+            hf_rev: d562806dbafae37109975e970aae91b43e73b440
+            file: Qwen3.8-27B-GSQ-RCO-IQ3_S.gguf
+            size: '11771546784'
+            sha256: 64b53b64c7aa39f20a7e54bd80582fe595b1d745624ee8a72e92508c0326d810
+            about: >-
+              Official Qwen3.8-27B, quantized by IST Austria (DASLab) with GSQ-RCO, which gives each
+              tensor its own precision within a size budget. Standard GGUF for stock llama.cpp. Fits
+              16 GB of memory where the 16.5 GB Q4_K_M does not.
+          - tag: qwen3.8-27b-abliterated-q4-k
+            title: Qwen3.8-27B abliterated Q4_K (16.8 GB)
+            hf_repo: huihui-ai/Huihui-Qwen3.8-27B-abliterated-GGUF
+            hf_rev: 1c69098e9c32db6dc06fc48f1d6cc75ad07da89e
+            file: Huihui-Qwen3.8-27B-abliterated-Q4_K.gguf
+            size: '16810714400'
+            sha256: 6c2c13cef89238c3604d756b07b3ef5fafebbd61095feb8553ff449c95e4c1c6
+            about: >-
+              Community model. huihui-ai removed refusal behaviour from Qwen3.8-27B (abliteration) and
+              quantized it. Not an official Qwen release; it may be less reliable than the original and
+              will not decline harmful requests.
           - tag: qwen3.8-flash-next-gsq-rco-abliterated-q2-0
             title: Qwen3.8-Flash-Next GSQ-RCO abliterated Q2_0 (first file, 38.0 GB)
             hf_repo: SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF
