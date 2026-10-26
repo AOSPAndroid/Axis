@@ -16,6 +16,11 @@ import it_tools as it
 import setup_local
 
 
+# The target's record when everything the installer script started has finished.
+FINISHED = {"settled": True, "waited_seconds": 2, "still_running": [], "left_running": [], "windows_installer_busy": False,
+            "tracking": "job object", "software": {"added": [], "removed": [], "changed": []}}
+
+
 class ITTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -218,7 +223,7 @@ class ITTests(unittest.TestCase):
         with it.target_lock(self.backend.state, "PC-1"):
             pass
 
-    def deploy_simulated(self, exit_code=0, mode="full", robocopy=1, mutate=False, launch_error=False, activity=None,
+    def deploy_simulated(self, exit_code=0, mode="full", robocopy=1, mutate=False, launch_error=False, activity=FINISHED,
                          status=None, event=None, clock=None):
         plan = self.plan(mode)
         if mutate:
@@ -282,6 +287,16 @@ class ITTests(unittest.TestCase):
         self.assertTrue(result["inspect_before_retry"])
         self.assertEqual(result["exit_code"], 0)
         self.assertIn("still running when monitoring stopped (setup.exe, Windows Installer)", result["message"])
+
+    def test_completion_not_confirmed_by_a_job_object_record_is_unknown(self):
+        for activity, reason in ((None, "no installer-activity record was written"),
+                                 (dict(FINISHED, tracking="process tree"), "could not track every process the script started")):
+            with self.subTest(reason=reason):
+                self.clear_remote_jobs()
+                result, _ = self.deploy_simulated(activity=activity)
+                self.assertEqual(result["state"], "unknown")
+                self.assertTrue(result["inspect_before_retry"])
+                self.assertIn(reason, result["message"])
 
     def test_install_summary_names_left_running_apps_and_unchanged_software(self):
         self.assertEqual(it.describe_install_activity({"settled": True, "waited_seconds": 3, "software": {}}),

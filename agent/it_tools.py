@@ -558,11 +558,10 @@ class ITTools:
                     if "software" in activity:
                         result["software_changes"] = activity["software"]
                 summary = describe_install_activity(activity)
-                if activity and not activity.get("settled"):
-                    running = list(activity.get("still_running") or []) + (["Windows Installer"] if activity.get("windows_installer_busy") else [])
+                unfinished = install_unconfirmed(activity)
+                if unfinished:
                     return dict(result, state="unknown", inspect_before_retry=True, message=(
-                        "Installer script exited with code %d, but installer activity was still running when monitoring "
-                        "stopped (%s); check the PC before retrying or verifying" % (exit_code, ", ".join(running) or "unknown")))
+                        "Installer script exited with code %d, but %s; check the PC before retrying or verifying" % (exit_code, unfinished)))
                 if exit_code == 0:
                     message = "Installer script returned 0"
                     state = "script_succeeded"
@@ -661,17 +660,19 @@ function Get-InstallActivity($tracker) {
     if ($tracker) {
         try { $ids = @([AxisInstallJob]::Processes($tracker)) } catch {}
     } else {
-        # Without a job object, follow the live process tree from this script.
+        # Without a job object, follow the process tree from this script, remembering every descendant seen so a
+        # child is still connected after its parent exits. A hand-off that started and exited unseen is missed, so
+        # this tracking never confirms that installation finished.
         try {
             $table = Get-ProcessTable $null
-            $known = @{}; $known[[long]$PID] = $true; $grew = $true
+            $grew = $true
             while ($grew) {
                 $grew = $false
                 foreach ($p in $table) {
-                    if (-not $known.ContainsKey([long]$p.ProcessId) -and $known.ContainsKey([long]$p.ParentProcessId)) { $known[[long]$p.ProcessId] = $true; $grew = $true }
+                    if (-not $AxisTree.ContainsKey([long]$p.ProcessId) -and $AxisTree.ContainsKey([long]$p.ParentProcessId)) { $AxisTree[[long]$p.ProcessId] = $true; $grew = $true }
                 }
             }
-            $ids = @($known.Keys)
+            $ids = @($table | Where-Object { $AxisTree.ContainsKey([long]$_.ProcessId) } | ForEach-Object { [long]$_.ProcessId })
         } catch {}
     }
     $running = @()
@@ -756,7 +757,7 @@ function Complete-InstallActivity($tracker, $before, $deadline, $exitCode, $stat
 def install_activity_setup(limit):
     """PowerShell that defines the wait and starts tracking; give the wait at most limit seconds from here."""
     keys = ", ".join("@{Path=%s; Scope=%s}" % (quote(path), quote(scope)) for path, scope in UNINSTALL_KEYS)
-    return ("$AxisUninstallKeys = @(%s)\n$axisDeadline = (Get-Date).AddSeconds(%d)\n%s\n"
+    return ("$AxisUninstallKeys = @(%s)\n$AxisTree = @{}; $AxisTree[[long]$PID] = $true\n$axisDeadline = (Get-Date).AddSeconds(%d)\n%s\n"
             "$axisTracker = $null; $axisBefore = $null\n"
             "try { $axisTracker = Start-InstallTracking; $axisBefore = Get-RegisteredSoftware } catch {}\n"
             % (keys, int(limit), INSTALL_ACTIVITY.strip()))
@@ -799,6 +800,18 @@ def describe_install_activity(activity):
     if activity.get("settled") and not any(software.get(key) for key in ("added", "removed", "changed")) and "software" in activity:
         parts.append("no change in registered software")
     return "; ".join(parts)
+
+
+def install_unconfirmed(activity):
+    """Why the target's record does not confirm that the installers the script started have finished, or None."""
+    if not activity:
+        return "no installer-activity record was written, so installer completion was not checked"
+    if not activity.get("settled"):
+        running = list(activity.get("still_running") or []) + (["Windows Installer"] if activity.get("windows_installer_busy") else [])
+        return "installer activity was still running when monitoring stopped (%s)" % (", ".join(running) or "unknown")
+    if activity.get("tracking") != "job object":
+        return "this PC could not track every process the script started, so installer completion is not confirmed"
+    return None
 
 
 def duration(seconds):
