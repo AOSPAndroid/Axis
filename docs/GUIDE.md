@@ -106,9 +106,12 @@ The connection is read-only and uses Python's built-in SQLite support. Atlas doe
 | `k2` | K2-Horizon-MoVA-36B-A4B | [12 parts, 22.4 GB](https://github.com/AOSPAndroid/Axis/releases/tag/k2-horizon-mova-36b-a4b-q4-k-m) | An alternative reasoning model; the launcher applies its sampling defaults. |
 | `27b` | Qwen3.8-27B | [9 parts, 16.5 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-q4-k-m) | A dense model to compare on harder tasks. Speed depends on hardware and offload. |
 | `gemma` | Gemma 4 26B-A4B | [8 parts, 14.4 GB](https://github.com/AOSPAndroid/Axis/releases/tag/gemma-4-26b-a4b-qat-q4-0) | An alternative from Google. |
+| `35b-distill` | Qwen3.8-35B-A3B distill | [12 parts, 21.7 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-35b-a3b-distill-q4-k-m) | Community distillation of Qwen3.8 into the 35B-A3B mixture-of-experts: as fast as `35b`, and it always thinks first. Not an official Qwen release. |
+| `27b-iq3` | Qwen3.8-27B IQ3_S | [7 parts, 11.8 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-gsq-rco-iq3-s) | The official 27B quantized smaller by IST Austria (GSQ-RCO). Fits 16 GB of RAM or a 16 GB graphics card where `27b` does not, with slightly lower quality. |
 | `9b-distill` | Qwen3.8-9B distill | [4 parts, 5.8 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-9b-q4-k-m) | A smaller community distillation. GPU fit also depends on context and runtime overhead. |
 | `35b-abliterated` | Qwen3.6-35B-A3B abliterated | [12 parts, 21.2 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.6-35b-a3b-abliterated-q4-k-m) | Community edit with refusals removed. Not recommended on work PCs. |
 | `flash-abliterated` | Qwen3.8-Flash-Next abliterated | [21 parts, 38.0 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-flash-next-gsq-rco-abliterated-q2-0) | Flash-Next with refusals removed, same speed. Uses the second file from Qwen3.8-Flash-Next, so download that model's 16 `-00002-of-00002` parts too if you don't have it. Not recommended on work PCs. |
+| `27b-abliterated` | Qwen3.8-27B abliterated | [9 parts, 16.8 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.8-27b-abliterated-q4-k) | Qwen3.8-27B with refusals removed. Not recommended on work PCs. |
 | `9b-abliterated` | Qwen3.5-9B abliterated | [3 parts, 5.6 GB](https://github.com/AOSPAndroid/Axis/releases/tag/qwen3.5-9b-abliterated-q4-k-m) | Same, smaller. Not recommended on work PCs. |
 
 To skip the menu, start Axis from a terminal in the `local-agent` folder with a model key:
