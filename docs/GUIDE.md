@@ -65,6 +65,8 @@ Changes ask for approval by default. `--yes` automatically approves actions for 
 
 When a full supported GGUF is present, Axis uses it directly. For model parts, it checks and joins them, deleting consumed parts; allow about 2 GB of spare disk. An interrupted join resumes next time. Then it starts the model and shows the AXIS banner and `You >` prompt.
 
+To join a model's parts without starting Axis, double-click **Join Model.bat**. It checks every part, joins them into the `local-agent` folder and stops. If several models are complete it asks which one. For parts kept somewhere else, run `Join Model.bat --folder D:\Models`.
+
 ![Starting Axis: choosing a model, loading it, and the first questions](images/01-start.png)
 
 If you've downloaded more than one model, Axis asks which one to use. Press Enter for the first one.
@@ -267,6 +269,7 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | "Python was not found" | Run `start.py` with the full path to `python.exe`, for example `C:\devhome\tools\python3.12\current\python.exe start.py`. |
 | "The system cannot find the path specified" at the start | Check that the ZIP was fully extracted and the launcher, Python and model paths exist. If it appears before the launcher runs, inspect Windows Command Prompt start-up settings. |
 | "The model is not ready yet" | One or more parts are missing or still downloading. Axis lists them. Download them and start again. |
+| The parts won't join | Double-click **Join Model.bat**. It names each part that is missing, still downloading, renamed by the browser (a `(1)` added after downloading it twice) or the wrong size, and says what to do. |
 | It stops while loading the model | Look at `server.log` in the `local-agent` folder. For memory errors, try `--ctx 8192`, or a smaller model. |
 | Answers are slow | Check the speed line. If "wrote" is under about 8 per second, use Qwen3.6-35B-A3B. On a PC with a weak graphics card, compare with `--cpu`. |
 | The answer is wrong or made up | Ask it to verify with tools, add the facts to your notes, or compare another model on the task. Thinking is already enabled by default. |

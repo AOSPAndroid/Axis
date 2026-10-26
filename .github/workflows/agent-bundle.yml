@@ -53,7 +53,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp agent/agent.py agent/it_tools.py agent/it_windows.ps1 agent/terminal_ui.py agent/web_tools.py agent/atlas_db.py agent/skill_library.py agent/launch_atlas.py agent/start.py agent/models.json "agent/Start Agent.bat" "agent/Start Axis + Atlas.bat" "agent/Configure Firecrawl.bat" bundle/local-agent/
+          cp agent/agent.py agent/it_tools.py agent/it_windows.ps1 agent/terminal_ui.py agent/web_tools.py agent/atlas_db.py agent/skill_library.py agent/launch_atlas.py agent/start.py agent/join_model.py agent/models.json "agent/Start Agent.bat" "agent/Join Model.bat" "agent/Start Axis + Atlas.bat" "agent/Configure Firecrawl.bat" bundle/local-agent/
           mkdir -p bundle/local-agent/notes && cp agent/notes/EXAMPLE.md bundle/local-agent/notes/
           cp -r agent/skills bundle/local-agent/
           cp agent/BUNDLE-README.txt bundle/local-agent/README.txt
@@ -75,13 +75,13 @@ jobs:
           import os
           from pathlib import Path
           import zipfile
-          modules = ('agent.py', 'it_tools.py', 'terminal_ui.py', 'web_tools.py', 'atlas_db.py', 'skill_library.py', 'launch_atlas.py', 'start.py')
+          modules = ('agent.py', 'it_tools.py', 'terminal_ui.py', 'web_tools.py', 'atlas_db.py', 'skill_library.py', 'launch_atlas.py', 'start.py', 'join_model.py')
           with zipfile.ZipFile('local-agent-windows.zip') as archive:
               assert archive.testzip() is None, 'Corrupt ZIP member'
               names = archive.namelist()
               skills = tuple(str(path.relative_to('agent')).replace(os.sep, '/') for path in sorted(Path('agent/skills').glob('*/SKILL.md')))
               assert skills, 'No bundled skills'
-              required = modules + skills + ('it_windows.ps1', 'models.json', 'Start Agent.bat', 'Start Axis + Atlas.bat', 'Configure Firecrawl.bat', 'README.txt', 'notes/EXAMPLE.md', 'BUNDLE-COMMIT.txt')
+              required = modules + skills + ('it_windows.ps1', 'models.json', 'Start Agent.bat', 'Join Model.bat', 'Start Axis + Atlas.bat', 'Configure Firecrawl.bat', 'README.txt', 'notes/EXAMPLE.md', 'BUNDLE-COMMIT.txt')
               for name in required:
                   data = archive.read('local-agent/' + name)
                   assert data, 'Empty bundle file: ' + name
