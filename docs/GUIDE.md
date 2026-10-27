@@ -164,6 +164,7 @@ Good to know:
 - Deployments and reboots create background jobs. Axis reports the queued job ID and returns to chat unless you asked it to wait or verify; `/jobs ID` reports progress without using the model. Queued does not mean completed, and installer exit 0 does not prove the application works.
 - Deployment results distinguish script exit 0, restart-required codes 3010/1641, failures and unknown outcomes. Script completion does not verify application health.
 - Structured service/process tools enforce protected targets and recheck identity against a recent inspection. General shell commands run with your Windows account's rights.
+- For a requested start, stop or restart of one named service on up to 50 explicit PCs, `bulk_service_action` asks once with every target listed. Under each PC's lock it reads the current service identity and checks it again during the change. It reports failures independently and never counts pending or unverified changes as successes; inspect an uncertain result before retrying.
 - Ctrl+C cancels the current chat request. Accepted background deployment/reboot jobs continue; inspect their status before retrying an uncertain operation.
 
 Axis reuses repeated note/package lookups within a request and stops a continuing identical lookup loop. It still checks live machine state and job progress. Declining an action prevents the same approval prompt appearing again in that request. A new request starts fresh.
