@@ -119,8 +119,8 @@ def join(key):
     start.log("Joining %s..." % model["name"])
     path = start.same_folder([start.materialize(f) for f in model["files"]])
     if os.path.normcase(os.path.dirname(os.path.abspath(path))) != os.path.normcase(start.HERE):
-        start.log("The parts are on another drive, so the model stayed there. Move %s next to Start Agent.bat."
-                  % ("its files" if len(model["files"]) > 1 else "it"))
+        start.log("The model files are ready in %s. To keep them next to this tool, move them into %s."
+                  % (os.path.dirname(path), start.HERE))
     return path
 
 

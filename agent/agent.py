@@ -166,8 +166,8 @@ class Agent:
         self.workdir = os.path.realpath(workdir)
         self.auto_approve = auto_approve
         self.think = think
-        self.sampling = {"temperature": 0.6 if think else 0.3, "top_p": 0.95 if think else 0.9}
-        self.sampling.update(sampling or {})
+        self._sampling_override = dict(sampling or {})
+        self.sampling = {"temperature": 0.6 if think else 0.3, "top_p": 0.95 if think else 0.9, **self._sampling_override}
         if not 0 <= self.sampling["temperature"] <= 2 or not 0 <= self.sampling["top_p"] <= 1:
             raise ValueError("Use a temperature from 0 to 2 and top-p from 0 to 1")
         self.web = WebTools() if web_enabled else None
@@ -269,6 +269,17 @@ class Agent:
             context = [l.strip() for l in lines[max(0, i - 1):i + 2] if l.strip()]
             out.append("%s:%d: %s" % (rel, i + 1, " | ".join(context)))
         return "\n".join(out)
+
+    def set_thinking(self, enabled):
+        """Turn the model's visible reasoning on or off for the next request. Recomputes the
+        think-derived sampling and reply length, keeping any explicit launcher override."""
+        enabled = bool(enabled)
+        if enabled == self.think:
+            return
+        self.think = enabled
+        self.sampling = {"temperature": 0.6 if enabled else 0.3, "top_p": 0.95 if enabled else 0.9, **self._sampling_override}
+        self.max_reply = min(4096 if enabled else 2048, self.ctx // 3)
+        self.history_budget = max(0, int((self.ctx - self.max_reply) * 3) - len(json.dumps(self.tools)))
 
     def warm_up(self):
         """Have the server process the system prompt now, so the first answer starts sooner."""
@@ -524,7 +535,7 @@ class Agent:
         if key is not None and name in ATLAS_TOOL_NAMES:
             key = key + (json.dumps(self.atlas.fingerprint(), sort_keys=True),)
         observations = {"search_notes", "read_note", "read_skill", "find_packages", "read_tool_output",
-                        "read_file", "list_dir", "inspect_computer", "directory_lookup"} | WEB_TOOL_NAMES | ATLAS_TOOL_NAMES
+                        "read_file", "list_dir", "inspect_computer", "inspect_computers", "directory_lookup"} | WEB_TOOL_NAMES | ATLAS_TOOL_NAMES
         read_job = name == "it_job_status" and isinstance(args, dict) and not args.get("acknowledge_unknown")
         if name not in observations and not read_job:
             # A command, change or unknown tool may invalidate reference data, even if it fails.

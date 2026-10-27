@@ -10,6 +10,11 @@ Keep agent.py, it_tools.py, it_windows.ps1, terminal_ui.py, web_tools.py and atl
 together.
 Atlas is not needed.
 
+For an explicit list of up to 50 PCs, Axis can check preflight, overview or
+disks in one read-only batch. It validates every target before reading and
+checks at most eight at once, keeping each PC's result or error in order.
+The bundled pc-health skill covers these batch checks.
+
 To start Axis and your installed Atlas together, run "Start Axis + Atlas.bat"
 under your DSK account. Both apps inherit that Windows account; no password
 is saved. Atlas must already have its dependencies installed.

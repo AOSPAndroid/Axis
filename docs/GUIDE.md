@@ -144,6 +144,11 @@ Type a request at the `You >` prompt and press Enter. Axis streams its answer be
 
 Structured inspection and directory tools run without approval and show compact results. Eligible read-only shell commands also run automatically; Axis checks shell commands with PowerShell's parser. Use `/output` to read the full saved result when the console shows a summary.
 
+For several explicit PCs, Axis can use `inspect_computers` with `preflight`,
+`overview` or `disks` for up to 50 targets. It validates the whole list first,
+checks up to eight PCs at once and reports each result or error in target order.
+Software, services and processes still use `inspect_computer` for one PC.
+
 ![Axis checking a PC's uptime and disk space without asking](images/02-check.png)
 
 ### Making changes
