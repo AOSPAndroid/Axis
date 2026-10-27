@@ -67,6 +67,11 @@ When a full supported GGUF is present, Axis uses it directly. For model parts, i
 
 To join a model's parts without starting Axis, double-click **Join Model.bat**. It checks every part, joins them into the `local-agent` folder and stops. If several models are complete it asks which one. For parts kept somewhere else, run `Join Model.bat --folder D:\Models`.
 
+After an interruption, the join verifies its existing parts and reconstructs its
+checkpoint, including when the checkpoint file is missing or incomplete. It
+checks the complete GGUF checksum before reporting it ready. A damaged prefix
+leaves the remaining download parts untouched and reports the problem.
+
 ![Starting Axis: choosing a model, loading it, and the first questions](images/01-start.png)
 
 If you've downloaded more than one model, Axis asks which one to use. Press Enter for the first one.

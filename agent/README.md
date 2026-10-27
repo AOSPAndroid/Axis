@@ -138,6 +138,11 @@ To only join a model's parts, double-click **Join Model.bat** (or run `python jo
 
 `--model flash` selects Qwen3.8-Flash-Next: all 36 download parts produce two GGUF files totalling 66.4 GB. Both files must be in the same folder. The launcher loads the first, and llama.cpp finds its companion. Model-specific server options enable memory mapping and lazy table reads. `--model flash-abliterated` selects SC117's abliterated edit of the same build: only its first file (21 parts, 38.0 GB) is different. Its second file is byte-identical to Flash-Next's, so the model entry marks it `same_as` that file and the launcher links the existing copy (or joins Flash-Next's parts) under the name llama.cpp expects. `--model k2` selects K2-Horizon-MoVA-36B-A4B. Model metadata may supply context, temperature and top-p defaults; explicit command-line values override them.
 
+Resumed joins recheck every complete part already in the unfinished file and
+recover from a missing or interrupted checkpoint. The complete GGUF checksum is
+verified before the model is marked ready. A damaged prefix stops the join
+without removing the remaining downloaded parts.
+
 ## Quick setup (Windows)
 
 `setup_local.py` downloads and verifies the model, installs the right llama.cpp build for your GPU, fetches the agent, and writes `start-server.bat` and `agent.bat` into `%USERPROFILE%\local-ai`:

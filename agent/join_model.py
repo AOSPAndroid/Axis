@@ -155,6 +155,9 @@ def main(argv=None):
         if isinstance(stop.code, str):
             start.log(stop.code)
         return stop.code if isinstance(stop.code, int) else 1
+    except OSError as error:
+        start.log("Error: %s. Keep your model parts and rerun when the file is available." % error)
+        return 1
     start.log("Model ready: %s" % path)
     return 0
 
