@@ -67,6 +67,8 @@ This session is {elevation}; remote operations use your account's rights. Report
 
 ## Windows tools
 - Prefer inspect_computer, find_packages, deploy_package and computer_action for supported operations. They work without Atlas running. Never bypass a blocked structured operation with run_command.
+- For a quick read across several PCs at once (preflight, overview or disks), use inspect_computers with the explicit list; it returns one row per PC and reports each unreachable PC without stopping the others. Use inspect_computer for one PC's services, processes or software.
+- To start, stop or restart one service by name on several PCs, use bulk_service_action with the explicit list: one approval covers them all, each PC is verified on its own, and a failing PC does not stop the rest. Use computer_action for a single PC bound to its snapshot. For anything beyond a single named service, run a saved script instead.
 - Package repository: {package_repo}. State and job logs: {state_dir}.
 - Resolve the exact package and action-specific script with find_packages before deployment. A unique search match can include its scripts; reuse them without a second discovery call. Multiple scripts still require an unambiguous selection. Use only explicit PCs supplied by the user or found in notes/directory results.
 - If several versions match and neither the user nor a known runbook selects one, immediately ask one short version question with a few exact returned names. Do not inspect targets, browse repository folders or read scripts to guess the preferred version. Results are sorted by name, not version/date, and may be paginated; list order does not establish the latest version.
@@ -165,8 +167,8 @@ class Agent:
         self.workdir = os.path.realpath(workdir)
         self.auto_approve = auto_approve
         self.think = think
-        self.sampling = {"temperature": 0.6 if think else 0.3, "top_p": 0.95 if think else 0.9}
-        self.sampling.update(sampling or {})
+        self._sampling_override = dict(sampling or {})
+        self.sampling = {"temperature": 0.6 if think else 0.3, "top_p": 0.95 if think else 0.9, **self._sampling_override}
         if not 0 <= self.sampling["temperature"] <= 2 or not 0 <= self.sampling["top_p"] <= 1:
             raise ValueError("Use a temperature from 0 to 2 and top-p from 0 to 1")
         self.web = WebTools() if web_enabled else None
@@ -268,6 +270,17 @@ class Agent:
             context = [l.strip() for l in lines[max(0, i - 1):i + 2] if l.strip()]
             out.append("%s:%d: %s" % (rel, i + 1, " | ".join(context)))
         return "\n".join(out)
+
+    def set_thinking(self, enabled):
+        """Turn the model's visible reasoning on or off for the next request. Recomputes the
+        think-derived sampling and reply length, keeping any explicit launcher override."""
+        enabled = bool(enabled)
+        if enabled == self.think:
+            return
+        self.think = enabled
+        self.sampling = {"temperature": 0.6 if enabled else 0.3, "top_p": 0.95 if enabled else 0.9, **self._sampling_override}
+        self.max_reply = min(4096 if enabled else 2048, self.ctx // 3)
+        self.history_budget = max(0, int((self.ctx - self.max_reply) * 3) - len(json.dumps(self.tools)))
 
     def warm_up(self):
         """Have the server process the system prompt now, so the first answer starts sooner."""
@@ -523,7 +536,7 @@ class Agent:
         if key is not None and name in ATLAS_TOOL_NAMES:
             key = key + (json.dumps(self.atlas.fingerprint(), sort_keys=True),)
         observations = {"search_notes", "read_note", "read_skill", "find_packages", "read_tool_output",
-                        "read_file", "list_dir", "inspect_computer", "directory_lookup"} | WEB_TOOL_NAMES | ATLAS_TOOL_NAMES
+                        "read_file", "list_dir", "inspect_computer", "inspect_computers", "directory_lookup"} | WEB_TOOL_NAMES | ATLAS_TOOL_NAMES
         read_job = name == "it_job_status" and isinstance(args, dict) and not args.get("acknowledge_unknown")
         if name not in observations and not read_job:
             # A command, change or unknown tool may invalidate reference data, even if it fails.

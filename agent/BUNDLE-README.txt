@@ -10,6 +10,15 @@ Keep agent.py, it_tools.py, it_windows.ps1, terminal_ui.py, web_tools.py and atl
 together.
 Atlas is not needed.
 
+For an explicit list of up to 50 PCs, Axis can check preflight, overview or
+disks in one read-only batch. It validates every target before reading and
+checks at most eight at once, keeping each PC's result or error in order.
+The bundled pc-health skill covers these batch checks.
+Start, stop or restart one named service on up to 50 explicit PCs with one
+approval listing every PC. Each change uses its PC's lock, current service
+identity and protected-service checks. Unknown or unverified changes never
+count as successes; inspect them before retrying.
+
 To start Axis and your installed Atlas together, run "Start Axis + Atlas.bat"
 under your DSK account. Both apps inherit that Windows account; no password
 is saved. Atlas must already have its dependencies installed.
@@ -131,6 +140,14 @@ tools; local chat, notes, files and IT tools remain available.
    (about 2 GB of spare disk; resumes if interrupted) and removes them.
    It then starts llama-server and opens the agent. Close the window to
    stop both.
+
+To join a model without starting anything, double-click "Join Model.bat".
+It checks each part, joins them next to it, and names any part that is
+missing, still downloading, renamed by the browser or the wrong size.
+Parts kept elsewhere: Join Model.bat --folder D:\Models
+Interrupted joins verify the existing prefix and rebuild their checkpoint.
+The complete GGUF checksum is checked before the model is marked ready.
+If the prefix is damaged, the remaining downloaded parts are left alone.
 
 BUNDLE-COMMIT.txt identifies the source commit used to build this ZIP.
 

@@ -65,6 +65,13 @@ Changes ask for approval by default. `--yes` automatically approves actions for 
 
 When a full supported GGUF is present, Axis uses it directly. For model parts, it checks and joins them, deleting consumed parts; allow about 2 GB of spare disk. An interrupted join resumes next time. Then it starts the model and shows the AXIS banner and `You >` prompt.
 
+To join a model's parts without starting Axis, double-click **Join Model.bat**. It checks every part, joins them into the `local-agent` folder and stops. If several models are complete it asks which one. For parts kept somewhere else, run `Join Model.bat --folder D:\Models`.
+
+After an interruption, the join verifies its existing parts and reconstructs its
+checkpoint, including when the checkpoint file is missing or incomplete. It
+checks the complete GGUF checksum before reporting it ready. A damaged prefix
+leaves the remaining download parts untouched and reports the problem.
+
 ![Starting Axis: choosing a model, loading it, and the first questions](images/01-start.png)
 
 If you've downloaded more than one model, Axis asks which one to use. Press Enter for the first one.
@@ -137,6 +144,11 @@ Type a request at the `You >` prompt and press Enter. Axis streams its answer be
 
 Structured inspection and directory tools run without approval and show compact results. Eligible read-only shell commands also run automatically; Axis checks shell commands with PowerShell's parser. Use `/output` to read the full saved result when the console shows a summary.
 
+For several explicit PCs, Axis can use `inspect_computers` with `preflight`,
+`overview` or `disks` for up to 50 targets. It validates the whole list first,
+checks up to eight PCs at once and reports each result or error in target order.
+Software, services and processes still use `inspect_computer` for one PC.
+
 ![Axis checking a PC's uptime and disk space without asking](images/02-check.png)
 
 ### Making changes
@@ -152,6 +164,7 @@ Good to know:
 - Deployments and reboots create background jobs. Axis reports the queued job ID and returns to chat unless you asked it to wait or verify; `/jobs ID` reports progress without using the model. Queued does not mean completed, and installer exit 0 does not prove the application works.
 - Deployment results distinguish script exit 0, restart-required codes 3010/1641, failures and unknown outcomes. Script completion does not verify application health.
 - Structured service/process tools enforce protected targets and recheck identity against a recent inspection. General shell commands run with your Windows account's rights.
+- For a requested start, stop or restart of one named service on up to 50 explicit PCs, `bulk_service_action` asks once with every target listed. Under each PC's lock it reads the current service identity and checks it again during the change. It reports failures independently and never counts pending or unverified changes as successes; inspect an uncertain result before retrying.
 - Ctrl+C cancels the current chat request. Accepted background deployment/reboot jobs continue; inspect their status before retrying an uncertain operation.
 
 Axis reuses repeated note/package lookups within a request and stops a continuing identical lookup loop. It still checks live machine state and job progress. Declining an action prevents the same approval prompt appearing again in that request. A new request starts fresh.
@@ -267,6 +280,7 @@ Add options after `"Start Agent.bat"` or `python start.py` in a terminal opened 
 | "Python was not found" | Run `start.py` with the full path to `python.exe`, for example `C:\devhome\tools\python3.12\current\python.exe start.py`. |
 | "The system cannot find the path specified" at the start | Check that the ZIP was fully extracted and the launcher, Python and model paths exist. If it appears before the launcher runs, inspect Windows Command Prompt start-up settings. |
 | "The model is not ready yet" | One or more parts are missing or still downloading. Axis lists them. Download them and start again. |
+| The parts won't join | Double-click **Join Model.bat**. It names each part that is missing, still downloading, renamed by the browser (a `(1)` added after downloading it twice) or the wrong size, and says what to do. |
 | It stops while loading the model | Look at `server.log` in the `local-agent` folder. For memory errors, try `--ctx 8192`, or a smaller model. |
 | Answers are slow | Check the speed line. If "wrote" is under about 8 per second, use Qwen3.6-35B-A3B. On a PC with a weak graphics card, compare with `--cpu`. |
 | The answer is wrong or made up | Ask it to verify with tools, add the facts to your notes, or compare another model on the task. Thinking is already enabled by default. |
